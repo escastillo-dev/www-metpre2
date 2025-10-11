@@ -23,18 +23,77 @@ body {
     box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
     position: relative;
     z-index: 10;
+    transition: width 0.3s ease;
+}
+
+.sidebar.collapsed {
+    width: 80px;
+}
+
+.sidebar-toggle {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    width: 30px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: white;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    transform: rotate(180deg);
+}
+
+.sidebar.collapsed .user-details,
+.sidebar.collapsed .nav-text {
+    display: none;
+}
+
+.sidebar.collapsed .nav-icon {
+    margin-right: 0;
+}
+
+.sidebar.collapsed .nav-item {
+    justify-content: center;
+    padding: 12px 0;
 }
 
 .sidebar-header {
-    padding: 30px 25px;
+    padding: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
 }
 
 .logo-section {
     display: flex;
     align-items: center;
     gap: 15px;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
+    padding-right: 30px;
+}
+
+.company-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+}
+
+.sidebar.collapsed .logo-section {
+    justify-content: center;
+    padding-right: 0;
 }
 
 .logo-icon {

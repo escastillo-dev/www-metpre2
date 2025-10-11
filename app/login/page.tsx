@@ -42,10 +42,20 @@ export default function LoginPage() {
 
       // Manejo de respuesta exitosa
       if (response.data.estatus === 1) {
+        // Crear credenciales en formato Base64 para autenticación básica
+        const credentials = btoa(`${nomina}:${password}`);
+        console.log('Credenciales generadas');
+        
+        const userName = response.data.usuario.nombre;
+        const idNivelUsuario = response.data.usuario.idNivelUsuario;
         const token = response.data.token;
-        const userName = response.data.usuario.nombre; // Extract the user's name
-        localStorage.setItem("authToken", token); // Save the token
-        localStorage.setItem("userName", userName); // Save the user's name
+        
+        // Guardar la información del usuario
+        localStorage.setItem("userCredentials", credentials);
+        localStorage.setItem("userName", userName);
+        localStorage.setItem("idNivelUsuario", idNivelUsuario.toString());
+        localStorage.setItem("authToken", token);
+        localStorage.setItem("userId", nomina); // Guardamos el ID del usuario que servirá para otras operaciones
         console.log("Login exitoso:", response.data);
         alert("Login exitoso");
         window.location.href = "/dashboard"; // Redirigir al dashboard
@@ -68,7 +78,7 @@ export default function LoginPage() {
 
       <div className="login-container">
         <div className="login-header">
-          <div className="logo">L</div>
+          <div className="logo">Met</div>
           <h1 className="login-title">Bienvenido</h1>
           <p className="login-subtitle">Inicia sesión en tu cuenta</p>
         </div>
@@ -107,7 +117,7 @@ export default function LoginPage() {
               <input type="checkbox" className="checkbox" />
               <span>Recordarme</span>
             </label>
-            <a href="#" className="forgot-password">¿Olvidaste tu contraseña?</a>
+            
           </div>
 
           <button type="submit" className="login-button">
@@ -115,9 +125,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="login-footer">
-          <p>¿No tienes una cuenta? <a href="#" className="signup-link">Regístrate aquí</a></p>
-        </div>
+       
       </div>
     </div>
   );
