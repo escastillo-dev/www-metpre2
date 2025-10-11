@@ -48,12 +48,14 @@ export default function LoginPage() {
         
         const userName = response.data.usuario.nombre;
         const idNivelUsuario = response.data.usuario.idNivelUsuario;
+        const nivelUsuario = idNivelUsuario === 1 ? 'Admin' : 'User'; // Asumiendo que 1 es Admin
         const token = response.data.token;
         
         // Guardar la información del usuario
         localStorage.setItem("userCredentials", credentials);
         localStorage.setItem("userName", userName);
         localStorage.setItem("idNivelUsuario", idNivelUsuario.toString());
+        localStorage.setItem("userLevel", nivelUsuario); // Guardamos el nivel como texto
         localStorage.setItem("authToken", token);
         localStorage.setItem("userId", nomina); // Guardamos el ID del usuario que servirá para otras operaciones
         console.log("Login exitoso:", response.data);

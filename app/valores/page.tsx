@@ -289,15 +289,8 @@ export default function ValoresPage() {
       console.log('Respuesta de movimientos:', response.data); // Para depuración
 
       if (response.data.estatus === 1 && Array.isArray(response.data.items)) {
-        // Convertimos los nombres de las sucursales asignadas a un Set para búsqueda eficiente
-        const sucursalesPermitidas = new Set(sucursalesAsignadas.map(s => s.Sucursal));
-        
-        // Procesamos los movimientos
+        // Procesamos los movimientos y los ordenamos por fecha y hora descendente
         const movimientosProcesados = response.data.items
-          .filter(movimiento => {
-            // Verificar si la sucursal del movimiento está en las asignadas
-            return sucursalesPermitidas.has(movimiento.Sucursales);
-          })
           .map(movimiento => ({
             folio: movimiento.Folio,
             sucursal: movimiento.Sucursales,
@@ -307,10 +300,17 @@ export default function ValoresPage() {
             incidencia: movimiento.Incidencia,
             tipoSF: movimiento.TipoSF,
             importe: movimiento.Importe
-          }));
+          }))
+          .sort((a, b) => {
+            // Comparar primero por fecha
+            const fechaComparacion = new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
+            if (fechaComparacion !== 0) return fechaComparacion;
+            // Si las fechas son iguales, comparar por hora
+            return b.hora.localeCompare(a.hora);
+          });
       
         setMovimientos(movimientosProcesados);
-        setTotal(movimientosProcesados.length); // Actualizamos el total solo con los movimientos permitidos
+        setTotal(response.data.total); // Mantenemos el total real de la API
       } else {
         console.error('Formato de respuesta inválido:', response.data);
         setError('Error al obtener los movimientos: formato de datos inválido');
