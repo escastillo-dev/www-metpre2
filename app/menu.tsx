@@ -19,14 +19,19 @@ export default function Menu() {
         <ul className="menu-list">
           {userLevel === 'Admin' && (
             <li className="menu-item">
-              <Link href="/usuarios" className="menu-link">
+              <Link href="/dashboard?panel=users" className="menu-link">
                 Usuarios
               </Link>
             </li>
           )}
           <li className="menu-item">
-            <Link href="/manejo-valores" className="menu-link">
+            <Link href="/dashboard?panel=valores" className="menu-link">
               Manejo de Valores
+            </Link>
+          </li>
+          <li className="menu-item">
+            <Link href="/dashboard?panel=apertura-cierres" className="menu-link">
+              Apertura y Cierres
             </Link>
           </li>
         </ul>

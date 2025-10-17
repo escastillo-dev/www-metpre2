@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import './dashboard.css';
 import DashboardOverview from '../components/DashboardOverview';
 import AssignSucursalModal from '../components/AssignSucursalModal';
 import EditUserModal from '../components/EditUserModal';
 import UserTable from '../components/UserTable';
+import ValoresContent from '../components/ValoresContent';
+import AperturaCierresContent from '../components/AperturaCierresContent';
 
 interface User {
   idUsuarios: number;
@@ -34,8 +36,9 @@ interface UserLevel {
   NivelUsuario: string;
 }
 
-export default function Dashboard() {
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isMenuCollapsed, setIsMenuCollapsed] = useState(false);
   const [activePanel, setActivePanel] = useState('dashboard');
@@ -75,9 +78,24 @@ export default function Dashboard() {
     setIsAuthenticated(!!token);
     setUserLevel(level || '');
     setUserName(name || '');
-    // Siempre iniciamos en el dashboard
-    setActivePanel('dashboard');
-  }, []);
+    
+    // Leer el parámetro 'panel' de la URL
+    try {
+      const panel = searchParams.get('panel');
+      if (panel === 'users') {
+        setActivePanel('users');
+      } else if (panel === 'valores') {
+        setActivePanel('valores');
+      } else if (panel === 'apertura-cierres') {
+        setActivePanel('apertura-cierres');
+      } else {
+        setActivePanel('dashboard');
+      }
+    } catch (error) {
+      console.log('Error reading search params:', error);
+      setActivePanel('dashboard');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -287,8 +305,13 @@ export default function Dashboard() {
             
             {!isMenuCollapsed && (
               <div className="user-info">
-                <div className="user-name">{userName}</div>
-                <div className="user-role">{userLevel}</div>
+                <div className="user-avatar">
+                  {userName ? userName.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div className="user-details">
+                  <h4 className="user-name">{userName}</h4>
+                  <h4 className="user-role">{userLevel}</h4>
+                </div>
               </div>
             )}
           </div>
@@ -298,7 +321,10 @@ export default function Dashboard() {
           <div className="nav-section">
             <div 
               className={`nav-item ${activePanel === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setActivePanel('dashboard')}
+              onClick={() => {
+                setActivePanel('dashboard');
+                router.push('/dashboard');
+              }}
             >
               <span className="nav-icon">🏠</span>
               {!isMenuCollapsed && <span className="nav-text">Dashboard</span>}
@@ -307,7 +333,10 @@ export default function Dashboard() {
             {userLevel === 'Admin' && (
               <div 
                 className={`nav-item ${activePanel === 'users' ? 'active' : ''}`}
-                onClick={() => setActivePanel('users')}
+                onClick={() => {
+                  setActivePanel('users');
+                  router.push('/dashboard?panel=users');
+                }}
               >
                 <span className="nav-icon">👥</span>
                 {!isMenuCollapsed && <span className="nav-text">Usuarios</span>}
@@ -316,10 +345,24 @@ export default function Dashboard() {
             
             <div 
               className={`nav-item ${activePanel === 'valores' ? 'active' : ''}`}
-              onClick={() => setActivePanel('valores')}
+              onClick={() => {
+                setActivePanel('valores');
+                router.push('/dashboard?panel=valores');
+              }}
             >
               <span className="nav-icon">💰</span>
               {!isMenuCollapsed && <span className="nav-text">Manejo de Valores</span>}
+            </div>
+
+            <div 
+              className={`nav-item ${activePanel === 'apertura-cierres' ? 'active' : ''}`}
+              onClick={() => {
+                setActivePanel('apertura-cierres');
+                router.push('/dashboard?panel=apertura-cierres');
+              }}
+            >
+              <span className="nav-icon">🌅</span>
+              {!isMenuCollapsed && <span className="nav-text">Apertura y cierres</span>}
             </div>
 
             <div
@@ -342,6 +385,7 @@ export default function Dashboard() {
             {activePanel === 'dashboard' && <DashboardOverview userLevel={userLevel} />}
             {activePanel === 'users' && 'Gestión de Usuarios'}
             {activePanel === 'valores' && 'Manejo de Valores'}
+            {activePanel === 'apertura-cierres' && 'Apertura y Cierres'}
           </h1>
         </div>
 
@@ -471,21 +515,22 @@ export default function Dashboard() {
           )}
 
           {activePanel === 'valores' && (
-            <div className="content-panel active">
-              <iframe
-                src="/valores"
-                style={{
-                  width: '100%',
-                  height: 'calc(100vh - 80px)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  backgroundColor: '#fff'
-                }}
-              />
-            </div>
+            <ValoresContent />
+          )}
+
+          {activePanel === 'apertura-cierres' && (
+            <AperturaCierresContent />
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

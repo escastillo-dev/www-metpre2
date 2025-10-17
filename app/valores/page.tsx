@@ -48,11 +48,7 @@ interface UsuarioResponse {
   estatus: number;
   mensaje: string;
   usuario: Usuario;
-  sucursales?: Array<{
-    idCentro: string;
-    Sucursales: string;
-  }>;
-  sucursales: Sucursal[];
+  sucursales?: Sucursal[];
 }
 
 import '../styles/forms.css';
@@ -334,44 +330,68 @@ export default function ValoresPage() {
       background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
       overflowY: "auto"
     }}>
+      
       <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "2rem",
-      }}>
-        <h3 style={{ color: "white", fontSize: "1.5rem", fontWeight: "600" }}>Manejo de Valores</h3>
-        <button
-          style={{
-            padding: "0.75rem 1.5rem",
-            backgroundColor: "#f5942b",
-            color: "white",
-            border: "none",
-            borderRadius: "0.375rem",
-            fontSize: "0.875rem",
-            fontWeight: "500",
-            cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "2rem",
+          background: "white",
+          padding: "1.5rem",
+          borderRadius: "12px",
+          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)"
+        }}>
+          <h1 style={{ 
+            color: "#2d3748", 
+            fontSize: "1.875rem", 
+            fontWeight: "700",
+            margin: 0,
             display: "flex",
             alignItems: "center",
-            gap: "0.5rem",
-            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-            transition: "background-color 0.2s",
-          }}
-          onClick={() => setShowModal(true)}
-        >
-          <span style={{ fontSize: "1.25rem" }}>💰</span>
-          Registrar Movimiento
-        </button>
-      </div>
+            gap: "0.75rem"
+          }}>
+            <span style={{ fontSize: "2rem" }}>💰</span>
+            Manejo de Valores
+          </h1>
+          <button
+            style={{
+              padding: "0.875rem 1.75rem",
+              backgroundColor: "#38a169",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "1rem",
+              fontWeight: "600",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+              transition: "all 0.2s ease"
+            }}
+            onClick={() => setShowModal(true)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#2f855a";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#38a169";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            <span style={{ fontSize: "1.25rem" }}>➕</span>
+            Registrar Movimiento
+          </button>
+        </div>
       
-      {/* Filtros */}
-      <div className="search-section" style={{
-        background: "rgba(255, 255, 255, 0.95)",
-        padding: "1.5rem",
-        borderRadius: "12px",
-        marginBottom: "1.5rem",
-        boxShadow: "0 5px 15px rgba(0, 0, 0, 0.08)"
-      }}>
+        {/* Filtros */}
+        <div className="search-section" style={{
+          background: "white",
+          padding: "1.5rem",
+          borderRadius: "12px",
+          marginBottom: "1.5rem",
+          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)"
+        }}>
         <h4 style={{ marginBottom: "1rem" }}>Filtros de Búsqueda</h4>
         <div style={{
           display: "grid",
@@ -477,14 +497,14 @@ export default function ValoresPage() {
         </div>
       </div>
 
-      {/* Lista de movimientos */}
-      <div style={{
-        background: "rgba(255, 255, 255, 0.95)",
-        borderRadius: "12px",
-        overflow: "hidden",
-        boxShadow: "0 5px 15px rgba(0, 0, 0, 0.08)",
-        width: "100%"
-      }}>
+        {/* Lista de movimientos */}
+        <div style={{
+          background: "white",
+          borderRadius: "12px",
+          overflow: "hidden",
+          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+          width: "100%"
+        }}>
         <div style={{ 
           padding: "1rem", 
           borderBottom: "1px solid #e2e8f0",
