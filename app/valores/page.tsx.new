@@ -1,0 +1,444 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+
+interface MovimientoAPI {
+  Folio: number;
+  Sucursales: string;
+  Fecha: string;
+  Movimiento: string;
+  Hora: string;
+  Incidencia: string;
+  TipoSF: string | null;
+  Importe: number | null;
+}
+
+interface Movimiento {
+  folio: number;
+  sucursal: string;
+  fecha: string;
+  hora: string;
+  movimiento: string;
+  incidencia: string;
+  tipoSF: string;
+  importe: number;
+}
+
+interface MovimientosResponse {
+  estatus: number;
+  total: number;
+  items: MovimientoAPI[];
+}
+
+interface Sucursal {
+  idCentro: string;
+  Sucursal: string;
+}
+
+interface Usuario {
+  idUsuarios: number;
+  NombreUsuario: string;
+  idNivelUsuario: number;
+  estatus: number;
+  FechaAlta?: string;
+}
+
+interface UsuarioResponse {
+  estatus: number;
+  mensaje: string;
+  usuario: Usuario;
+  sucursales: Sucursal[];
+}
+
+export default function ValoresPage() {
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [total, setTotal] = useState(0);
+  const [sucursalesAsignadas, setSucursalesAsignadas] = useState<Sucursal[]>([]);
+  
+  // Estados para paginación
+  const [limit, setLimit] = useState(100);
+  const [offset, setOffset] = useState(0);
+  
+  // Estado para filtros
+  const [fechaFiltro, setFechaFiltro] = useState('');
+  const [folioFiltro, setFolioFiltro] = useState('');
+  const [sucursalFiltro, setSucursalFiltro] = useState('');
+
+  // Función para obtener las sucursales asignadas al usuario
+  const fetchSucursalesAsignadas = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const userCredentials = localStorage.getItem('userCredentials');
+      const userId = localStorage.getItem('userId');
+      
+      if (!userCredentials || !userId) {
+        setError('No se encontraron las credenciales del usuario');
+        setLoading(false);
+        return;
+      }
+
+      const response = await axios.get<UsuarioResponse>(`http://127.0.0.1:8000/usuarios/${userId}`, {
+        headers: {
+          'Authorization': `Basic ${userCredentials}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.estatus === 1 && Array.isArray(response.data.sucursales)) {
+        setSucursalesAsignadas(response.data.sucursales);
+        console.log('Sucursales asignadas:', response.data.sucursales);
+      } else {
+        console.error('Formato de respuesta inválido para sucursales:', response.data);
+        setError('Error al obtener la información de las sucursales');
+      }
+    } catch (error) {
+      console.error('Error al obtener sucursales asignadas:', error);
+      setError('Error al obtener las sucursales asignadas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Efecto para cargar sucursales al iniciar
+  useEffect(() => {
+    fetchSucursalesAsignadas();
+  }, []); // Solo se ejecuta al montar el componente
+
+  // Efecto para cargar movimientos cuando cambien los filtros o las sucursales
+  useEffect(() => {
+    if (sucursalesAsignadas.length > 0) {
+      fetchMovimientos();
+    }
+  }, [sucursalesAsignadas, offset, limit, fechaFiltro, folioFiltro, sucursalFiltro]);
+
+  const fetchMovimientos = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const userCredentials = localStorage.getItem('userCredentials');
+      if (!userCredentials) {
+        setError('No se encontraron las credenciales');
+        setLoading(false);
+        return;
+      }
+
+      if (sucursalesAsignadas.length === 0) {
+        setMovimientos([]);
+        setTotal(0);
+        setLoading(false);
+        return;
+      }
+
+      // Construir URL con parámetros de consulta
+      let url = `http://127.0.0.1:8000/mmv/movimientos?limit=${limit}&offset=${offset}`;
+      
+      // Agregar los IDs de las sucursales asignadas
+      const sucursalesIds = sucursalesAsignadas.map(s => s.idCentro).join(',');
+      url += `&sucursales=${sucursalesIds}`;
+
+      if (fechaFiltro) {
+        url += `&fecha=${fechaFiltro}`;
+      }
+      if (folioFiltro) {
+        url += `&folio=${folioFiltro}`;
+      }
+      // Solo aplicar el filtro de sucursal si está dentro de las asignadas
+      if (sucursalFiltro && sucursalesAsignadas.some(s => s.idCentro === sucursalFiltro)) {
+        url += `&idCentro=${sucursalFiltro}`;
+      }
+
+      const response = await axios.get<MovimientosResponse>(url, {
+        headers: {
+          'Authorization': `Basic ${userCredentials}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Respuesta de movimientos:', response.data); // Para depuración
+
+      if (response.data.estatus === 1 && Array.isArray(response.data.items)) {
+        // Asegurarnos de que cada movimiento tenga las propiedades necesarias
+        const movimientosProcesados = response.data.items.map(movimiento => ({
+          folio: movimiento.Folio || 0,
+          sucursal: movimiento.Sucursales || '',
+          fecha: movimiento.Fecha || new Date().toISOString(),
+          hora: movimiento.Hora || '',
+          movimiento: movimiento.Movimiento || '',
+          incidencia: movimiento.Incidencia || '',
+          tipoSF: movimiento.TipoSF || '',
+          importe: movimiento.Importe || 0
+        }));
+      
+        setMovimientos(movimientosProcesados);
+        setTotal(response.data.total || movimientosProcesados.length);
+      } else {
+        console.error('Formato de respuesta inválido:', response.data);
+        setError('Error al obtener los movimientos: formato de datos inválido');
+      }
+    } catch (error) {
+      console.error('Error al cargar los movimientos:', error);
+      setError('Error al cargar los movimientos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div>Cargando...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <div style={{
+      width: "100%",
+      height: "100vh",
+      padding: "2rem",
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      overflowY: "auto"
+    }}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "2rem",
+      }}>
+        <h3 style={{ color: "white", fontSize: "1.5rem", fontWeight: "600" }}>Manejo de Valores</h3>
+      </div>
+
+      {/* Filtros */}
+      <div className="search-section" style={{
+        background: "rgba(255, 255, 255, 0.95)",
+        borderRadius: "12px",
+        padding: "1.5rem",
+        marginBottom: "2rem",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)"
+      }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+          gap: "1rem",
+          marginBottom: "1rem"
+        }}>
+          {/* Filtro de Fecha */}
+          <div>
+            <label style={{
+              display: "block",
+              marginBottom: "0.5rem",
+              color: "#4a5568",
+              fontSize: "0.875rem",
+              fontWeight: "500"
+            }}>
+              Fecha
+            </label>
+            <input
+              type="date"
+              value={fechaFiltro}
+              onChange={(e) => {
+                setFechaFiltro(e.target.value);
+                setOffset(0);
+              }}
+              style={{
+                width: "100%",
+                padding: "0.5rem",
+                border: "1px solid #e2e8f0",
+                borderRadius: "0.375rem",
+                fontSize: "0.875rem"
+              }}
+            />
+          </div>
+
+          {/* Filtro de Folio */}
+          <div>
+            <label style={{
+              display: "block",
+              marginBottom: "0.5rem",
+              color: "#4a5568",
+              fontSize: "0.875rem",
+              fontWeight: "500"
+            }}>
+              Folio
+            </label>
+            <input
+              type="text"
+              value={folioFiltro}
+              onChange={(e) => {
+                setFolioFiltro(e.target.value);
+                setOffset(0);
+              }}
+              style={{
+                width: "100%",
+                padding: "0.5rem",
+                border: "1px solid #e2e8f0",
+                borderRadius: "0.375rem",
+                fontSize: "0.875rem"
+              }}
+              placeholder="Buscar por folio..."
+            />
+          </div>
+
+          {/* Filtro de Sucursal */}
+          <div>
+            <label style={{
+              display: "block",
+              marginBottom: "0.5rem",
+              color: "#4a5568",
+              fontSize: "0.875rem",
+              fontWeight: "500"
+            }}>
+              Sucursal
+            </label>
+            <select
+              value={sucursalFiltro}
+              onChange={(e) => {
+                setSucursalFiltro(e.target.value);
+                setOffset(0);
+              }}
+              style={{
+                width: "100%",
+                padding: "0.5rem",
+                border: "1px solid #e2e8f0",
+                borderRadius: "0.375rem",
+                fontSize: "0.875rem",
+                backgroundColor: "white"
+              }}
+            >
+              <option value="">Todas las sucursales</option>
+              {sucursalesAsignadas.map((sucursal) => (
+                <option key={sucursal.idCentro} value={sucursal.idCentro}>
+                  {sucursal.Sucursal}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Botón de limpiar filtros */}
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            style={{
+              padding: "0.5rem 1rem",
+              backgroundColor: "#718096",
+              color: "white",
+              border: "none",
+              borderRadius: "0.375rem",
+              cursor: "pointer",
+              fontWeight: "500"
+            }}
+            onClick={() => {
+              setFechaFiltro('');
+              setFolioFiltro('');
+              setSucursalFiltro('');
+              setOffset(0);
+              fetchMovimientos();
+            }}
+          >
+            Limpiar Filtros
+          </button>
+        </div>
+      </div>
+
+      {/* Lista de movimientos */}
+      <div style={{
+        background: "rgba(255, 255, 255, 0.95)",
+        borderRadius: "12px",
+        overflow: "hidden",
+        boxShadow: "0 5px 15px rgba(0, 0, 0, 0.08)",
+        width: "100%"
+      }}>
+        <div style={{ 
+          padding: "1rem", 
+          borderBottom: "1px solid #e2e8f0",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>Total de registros: {total}</h3>
+        </div>
+        <div style={{ overflowX: "auto", width: "100%" }}>
+          <table style={{
+            width: "100%",
+            borderCollapse: "collapse"
+          }}>
+            <thead>
+              <tr>
+                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Folio</th>
+                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Sucursal</th>
+                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Fecha</th>
+                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Hora</th>
+                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Movimiento</th>
+                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568" }}>Incidencia</th>
+                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Tipo SF</th>
+                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {movimientos.map((movimiento) => (
+                <tr key={movimiento.folio} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.folio}</td>
+                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.sucursal}</td>
+                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>
+                    {movimiento.fecha ? new Date(movimiento.fecha).toLocaleDateString() : 'N/A'}
+                  </td>
+                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.hora}</td>
+                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.movimiento}</td>
+                  <td style={{ padding: "1rem" }}>{movimiento.incidencia}</td>
+                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.tipoSF || 'N/A'}</td>
+                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>
+                    {movimiento.importe ? `$${movimiento.importe.toFixed(2)}` : 'N/A'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Paginación */}
+        <div style={{
+          padding: "1rem",
+          borderTop: "1px solid #e2e8f0",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <button
+              onClick={() => setOffset(Math.max(0, offset - limit))}
+              disabled={offset === 0}
+              style={{
+                padding: "0.5rem 1rem",
+                border: "1px solid #e2e8f0",
+                borderRadius: "0.375rem",
+                backgroundColor: offset === 0 ? "#f7fafc" : "white",
+                cursor: offset === 0 ? "not-allowed" : "pointer",
+                opacity: offset === 0 ? "0.5" : "1"
+              }}
+            >
+              Anterior
+            </button>
+            <span style={{ color: "#4a5568", fontWeight: "500" }}>
+              Página {Math.floor(offset / limit) + 1}
+            </span>
+            <button
+              onClick={() => setOffset(offset + limit)}
+              disabled={total <= offset + limit}
+              style={{
+                padding: "0.5rem 1rem",
+                border: "1px solid #e2e8f0",
+                borderRadius: "0.375rem",
+                backgroundColor: total <= offset + limit ? "#f7fafc" : "white",
+                cursor: total <= offset + limit ? "not-allowed" : "pointer",
+                opacity: total <= offset + limit ? "0.5" : "1"
+              }}
+            >
+              Siguiente
+            </button>
+          </div>
+          <div style={{ color: "#4a5568", fontWeight: "500" }}>
+            {`Mostrando ${Math.min(offset + 1, total)}-${Math.min(offset + limit, total)} de ${total}`}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
