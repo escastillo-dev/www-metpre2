@@ -10,6 +10,7 @@ import EditUserModal from '../components/EditUserModal';
 import UserTable from '../components/UserTable';
 import ValoresContent from '../components/ValoresContent';
 import AperturaCierresContent from '../components/AperturaCierresContent';
+import MermasContent from '../components/MermasContent';
 
 interface User {
   idUsuarios: number;
@@ -26,7 +27,7 @@ interface Zona {
 }
 
 interface Sucursal {
-  idCentro: string | number;
+  idCentro: string;
   Sucursales: string;
   idZona?: number;
 }
@@ -58,7 +59,7 @@ function DashboardContent() {
   const [totalUsers, setTotalUsers] = useState(0);
 
   // Estados para sucursales
-  const [selectedSucursal, setSelectedSucursal] = useState<number | null>(null);
+  const [selectedSucursal, setSelectedSucursal] = useState<string | null>(null);
   const [selectedZona, setSelectedZona] = useState("Todas las zonas");
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
@@ -88,6 +89,8 @@ function DashboardContent() {
         setActivePanel('valores');
       } else if (panel === 'apertura-cierres') {
         setActivePanel('apertura-cierres');
+      } else if (panel === 'mermas') {
+        setActivePanel('mermas');
       } else {
         setActivePanel('dashboard');
       }
@@ -110,7 +113,24 @@ function DashboardContent() {
   // Efecto específico para cargar zonas cuando se abre el modal de asignación
   useEffect(() => {
     if (assigningUser) {
+      console.log('Modal abierto para usuario:', assigningUser);
       fetchZonas();
+      // Reset estados del modal de forma más agresiva
+      setSelectedZona("Todas las zonas");
+      setSelectedSucursal(null); // Forzar a null
+      setSucursales([]);
+      setFilteredSucursales([]);
+      
+      // Cargar sucursales inmediatamente
+      setTimeout(() => {
+        fetchSucursales(0);
+      }, 100);
+    } else {
+      // Cuando se cierra el modal, limpiar todo
+      setSelectedZona("Todas las zonas");
+      setSelectedSucursal(null);
+      setSucursales([]);
+      setFilteredSucursales([]);
     }
   }, [assigningUser]);
 
@@ -171,6 +191,10 @@ function DashboardContent() {
 
   const fetchSucursales = async (zonaId: number) => {
     try {
+      console.log('=== INICIO fetchSucursales ===');
+      console.log('ZonaId recibido:', zonaId);
+      console.log('Usuario asignado:', assigningUser);
+
       if (!assigningUser) {
         console.error('No hay usuario seleccionado');
         return;
@@ -190,7 +214,7 @@ function DashboardContent() {
         url += `?idZona=${zonaId}`;
       }
 
-      console.log('Fetching sucursales with URL:', url);
+      console.log('URL construida:', url);
 
       const response = await axios.get(url, {
         headers: {
@@ -199,18 +223,61 @@ function DashboardContent() {
         }
       });
 
-      console.log('Sucursales response:', response.data);
+      console.log('Response completo:', response);
+      console.log('Response data:', response.data);
+      console.log('Response status:', response.status);
 
-      if (response.data && Array.isArray(response.data.sucursales)) {
-        setSucursales(response.data.sucursales);
-        setFilteredSucursales(response.data.sucursales);
-      } else {
-        console.error('La respuesta no tiene el formato esperado:', response.data);
-        setSucursales([]);
-        setFilteredSucursales([]);
+      // Verificar diferentes formatos posibles de respuesta
+      let sucursalesData = [];
+      
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          // Si la respuesta es directamente un array
+          sucursalesData = response.data;
+          console.log('Formato: Array directo');
+        } else if (response.data.sucursales && Array.isArray(response.data.sucursales)) {
+          // Si tiene la propiedad sucursales
+          sucursalesData = response.data.sucursales;
+          console.log('Formato: Objeto con propiedad sucursales');
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          // Si tiene la propiedad data
+          sucursalesData = response.data.data;
+          console.log('Formato: Objeto con propiedad data');
+        } else {
+          console.error('Formato de respuesta no reconocido:', response.data);
+        }
       }
+
+      console.log('Sucursales procesadas:', sucursalesData);
+      console.log('Cantidad de sucursales:', sucursalesData.length);
+
+      if (sucursalesData.length > 0) {
+        // Mostrar estructura del primer elemento para debug
+        console.log('Estructura del primer elemento:', sucursalesData[0]);
+        console.log('Propiedades disponibles:', Object.keys(sucursalesData[0]));
+      }
+
+      setSucursales(sucursalesData);
+      setFilteredSucursales(sucursalesData);
+      
+      console.log('Estados actualizados con', sucursalesData.length, 'sucursales');
+      console.log('=== FIN fetchSucursales ===');
+
     } catch (error) {
-      console.error('Error fetching sucursales:', error);
+      console.error('=== ERROR en fetchSucursales ===');
+      console.error('Error completo:', error);
+      
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+      }
+      
+      // Type guard para axios error
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any;
+        console.error('Error response status:', axiosError.response?.status);
+        console.error('Error response data:', axiosError.response?.data);
+      }
+      
       setSucursales([]);
       setFilteredSucursales([]);
     }
@@ -239,6 +306,8 @@ function DashboardContent() {
         alert(response.data.mensaje || 'Usuario actualizado correctamente');
         // Primero aseguramos que estamos en el panel de usuarios
         setActivePanel('users');
+        // También actualizar la URL para mantener el panel
+        router.push('/dashboard?panel=users');
         // Luego actualizamos los datos y limpiamos el formulario
         await fetchUsers();
         setEditingUser(null);
@@ -365,6 +434,17 @@ function DashboardContent() {
               {!isMenuCollapsed && <span className="nav-text">Apertura y cierres</span>}
             </div>
 
+            <div 
+              className={`nav-item ${activePanel === 'mermas' ? 'active' : ''}`}
+              onClick={() => {
+                setActivePanel('mermas');
+                router.push('/dashboard?panel=mermas');
+              }}
+            >
+              <span className="nav-icon">📉</span>
+              {!isMenuCollapsed && <span className="nav-text">Manejo de Mermas</span>}
+            </div>
+
             <div
               className="nav-item"
               onClick={() => {
@@ -386,6 +466,7 @@ function DashboardContent() {
             {activePanel === 'users' && 'Gestión de Usuarios'}
             {activePanel === 'valores' && 'Manejo de Valores'}
             {activePanel === 'apertura-cierres' && 'Apertura y Cierres'}
+            {activePanel === 'mermas' && 'Manejo de Mermas'}
           </h1>
         </div>
 
@@ -480,7 +561,7 @@ function DashboardContent() {
                   try {
                     const response = await axios.post(
                       `http://127.0.0.1:8000/usuarios/${assigningUser?.idUsuarios}/sucursales`,
-                      { idCentro: selectedSucursal.toString() },
+                      { idCentro: selectedSucursal },
                       {
                         headers: {
                           'Authorization': `Basic ${localStorage.getItem('userCredentials')}`,
@@ -520,6 +601,10 @@ function DashboardContent() {
 
           {activePanel === 'apertura-cierres' && (
             <AperturaCierresContent />
+          )}
+
+          {activePanel === 'mermas' && (
+            <MermasContent />
           )}
         </div>
       </div>

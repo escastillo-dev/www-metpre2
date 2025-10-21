@@ -34,6 +34,11 @@ export default function Menu() {
               Apertura y Cierres
             </Link>
           </li>
+          <li className="menu-item">
+            <Link href="/mermas" className="menu-link">
+              📉 Manejo de Mermas
+            </Link>
+          </li>
         </ul>
       </nav>
     </div>

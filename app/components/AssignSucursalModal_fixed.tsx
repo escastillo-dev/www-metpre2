@@ -41,13 +41,74 @@ const AssignSucursalModal: React.FC<AssignSucursalModalProps> = ({
 }) => {
   if (!show || !user) return null;
   
+  // Debug logs
+  console.log('=== MODAL RENDER ===');
+  console.log('User:', user);
+  console.log('Zonas:', zonas);
+  console.log('Sucursales:', sucursales);
+  console.log('Filtered Sucursales:', filteredSucursales);
+  console.log('Selected Zona:', selectedZona);
+  console.log('Selected Sucursal:', selectedSucursal);
+  console.log('setSelectedSucursal function:', typeof setSelectedSucursal);
+  
   // Determinar qué sucursales mostrar
   const sucursalesToShow = selectedZona === "Todas las zonas" ? sucursales : filteredSucursales;
+  console.log('Sucursales to show:', sucursalesToShow);
   
   return (
     <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
       <div className="modal-content" style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '400px' }}>
         <h3>Asignar Sucursal</h3>
+        
+        {/* Debug Panel - Temporal para diagnosticar */}
+        <div style={{ backgroundColor: '#f0f0f0', padding: '10px', marginBottom: '15px', fontSize: '12px', border: '1px solid #ccc' }}>
+          <strong>DEBUG INFO:</strong><br/>
+          Usuario: {user.NombreUsuario} (ID: {user.idUsuarios})<br/>
+          Zona seleccionada: {selectedZona}<br/>
+          Sucursal seleccionada: "{selectedSucursal}" (tipo: {typeof selectedSucursal})<br/>
+          Es null?: {selectedSucursal === null ? 'SÍ' : 'NO'}<br/>
+          Es undefined?: {selectedSucursal === undefined ? 'SÍ' : 'NO'}<br/>
+          Total zonas: {zonas.length}<br/>
+          Total sucursales: {sucursales.length}<br/>
+          Sucursales filtradas: {filteredSucursales.length}<br/>
+          Sucursales a mostrar: {sucursalesToShow.length}<br/>
+          {sucursalesToShow.length > 0 && (
+            <>
+              Primera sucursal: {JSON.stringify(sucursalesToShow[0])}<br/>
+              Campos disponibles: {sucursalesToShow[0] ? Object.keys(sucursalesToShow[0]).join(', ') : 'N/A'}<br/>
+              <button 
+                type="button" 
+                onClick={() => {
+                  console.log('=== TEST BUTTON CLICKED ===');
+                  const testSucursal = sucursalesToShow[0];
+                  console.log('Primera sucursal:', testSucursal);
+                  
+                  if (testSucursal) {
+                    let testValue: string;
+                    if (typeof testSucursal.idCentro === 'string') {
+                      testValue = testSucursal.idCentro;
+                    } else {
+                      testValue = testSucursal.idCentro.toString();
+                    }
+                    
+                    console.log('Valor de test a establecer:', testValue);
+                    console.log('Tipo del valor de test:', typeof testValue);
+                    
+                    setSelectedSucursal(testValue);
+                    
+                    setTimeout(() => {
+                      console.log('Verificación después del test - selectedSucursal:', selectedSucursal);
+                    }, 100);
+                  }
+                  console.log('=== FIN TEST BUTTON ===');
+                }}
+                style={{ fontSize: '10px', padding: '2px 5px', marginTop: '5px' }}
+              >
+                Test: Seleccionar primera sucursal
+              </button>
+            </>
+          )}
+        </div>
         
         <form onSubmit={onSubmit}>
           <div style={{ marginBottom: '20px' }}>
@@ -59,6 +120,9 @@ const AssignSucursalModal: React.FC<AssignSucursalModalProps> = ({
               value={selectedZona}
               onChange={async (e) => {
                 const zonaNombre = e.target.value;
+                console.log('=== ZONA CHANGE EVENT ===');
+                console.log('Zona seleccionada:', zonaNombre);
+                console.log('Zonas disponibles:', zonas);
                 
                 setSelectedZona(zonaNombre);
                 setSelectedSucursal(null); // Reset sucursal selection
@@ -66,12 +130,16 @@ const AssignSucursalModal: React.FC<AssignSucursalModalProps> = ({
                 let zonaId = 0;
                 if (zonaNombre !== "Todas las zonas") {
                   const zonaSeleccionada = zonas.find(z => z.Zona === zonaNombre);
+                  console.log('Zona encontrada:', zonaSeleccionada);
                   if (zonaSeleccionada) {
                     zonaId = zonaSeleccionada.idZona;
                   }
                 }
+                console.log('ID de zona a usar:', zonaId);
+                console.log('Llamando a fetchSucursales...');
                 
                 await fetchSucursales(zonaId);
+                console.log('=== FIN ZONA CHANGE ===');
               }}
               style={{ width: '100%', padding: '8px', margin: '10px 0', borderRadius: '4px', border: '1px solid #ccc' }}
             >
@@ -86,15 +154,27 @@ const AssignSucursalModal: React.FC<AssignSucursalModalProps> = ({
             <select
               value={selectedSucursal || ''}
               onChange={(e) => {
+                console.log('=== SUCURSAL CHANGE EVENT ===');
                 const selectedValue = e.target.value;
+                console.log('Valor seleccionado del select:', selectedValue);
+                console.log('Tipo del valor:', typeof selectedValue);
                 
                 if (selectedValue === '' || selectedValue === null || selectedValue === undefined) {
+                  console.log('Valor vacío, estableciendo null');
                   setSelectedSucursal(null);
                   return;
                 }
                 
                 // Ya es string, solo verificar que no esté vacío
+                console.log('Llamando a setSelectedSucursal con:', selectedValue);
                 setSelectedSucursal(selectedValue);
+                
+                // Verificar inmediatamente después
+                setTimeout(() => {
+                  console.log('Verificación post-set - selectedSucursal debería ser:', selectedValue);
+                }, 50);
+                
+                console.log('=== FIN SUCURSAL CHANGE ===');
               }}
               style={{ width: '100%', padding: '8px', margin: '10px 0', borderRadius: '4px', border: '1px solid #ccc' }}
             >
