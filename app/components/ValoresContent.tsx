@@ -7,6 +7,9 @@ import ValoresModal from './ValoresModal';
 import '../styles/forms.css';
 import '../dashboard/dashboard.css';
 
+// URL de la API - usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 interface MovimientoAPI {
   Folio: number;
   Sucursales: string;
@@ -126,7 +129,7 @@ export default function ValoresContent() {
         hora = hora + ':00';
       }
       const response = await axios.post(
-        'http://127.0.0.1:8000/mmv/movimientos',
+        `${API_URL}/mmv/movimientos`,
         {
           ...formData,
           idUsuarios: parseInt(userId),
@@ -201,7 +204,7 @@ export default function ValoresContent() {
         return;
       }
 
-      const response = await axios.get<UsuarioResponse>(`http://127.0.0.1:8000/usuarios/${userId}`, {
+      const response = await axios.get<UsuarioResponse>(`${API_URL}/usuarios/${userId}`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -232,7 +235,7 @@ export default function ValoresContent() {
         return;
       }
 
-      const response = await axios.get('http://127.0.0.1:8000/Incidencias', {
+      const response = await axios.get(`${API_URL}/Incidencias`, {
         params: { limit: 50, offset: 0 },
         headers: {
           'Authorization': `Basic ${userCredentials}`,
@@ -277,7 +280,7 @@ export default function ValoresContent() {
         return;
       }
 
-      let url = `http://127.0.0.1:8000/mmv/movimientos?limit=${limit}&offset=${offset}`;
+      let url = `${API_URL}/mmv/movimientos?limit=${limit}&offset=${offset}`;
       
       const sucursalesIds = sucursalesAsignadas.map(s => s.idCentro).join(',');
       url += `&sucursales=${sucursalesIds}`;

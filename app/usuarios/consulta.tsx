@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
+// URL de la API - usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 interface Usuario {
   idUsuarios: number;
   NombreUsuario: string;
@@ -19,7 +22,7 @@ export default function ConsultarUsuarios() {
   useEffect(() => {
     async function fetchUsers() {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/usuarios", {
+        const response = await axios.get(`${API_URL}/usuarios`, {
           headers: {
             "Content-Type": "application/json",
           },
@@ -55,7 +58,7 @@ export default function ConsultarUsuarios() {
     };
 
     try {
-      const response = await axios.post("http://127.0.0.1:8000/usuarios", newUser, {
+      const response = await axios.post(`${API_URL}/usuarios`, newUser, {
         headers: {
           "Content-Type": "application/json",
         },
@@ -70,7 +73,7 @@ export default function ConsultarUsuarios() {
 
   const deleteUser = async (id: number) => {
     try {
-      await axios.delete(`http://127.0.0.1:8000/usuarios/${id}`);
+      await axios.delete(`${API_URL}/usuarios/${id}`);
       setUsers((prevUsers) => prevUsers.filter((user) => user.idUsuarios !== id));
     } catch (err) {
       console.error("Error deleting user:", err);

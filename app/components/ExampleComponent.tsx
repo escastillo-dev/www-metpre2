@@ -33,6 +33,14 @@ export default function ExampleComponent({}: ExampleComponentProps) {
 
   // Estado local del componente
   const [selectedSucursal, setSelectedSucursal] = useState<string>('');
+  // Responsive breakpoint
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Effects
   useEffect(() => {
@@ -141,15 +149,16 @@ export default function ExampleComponent({}: ExampleComponentProps) {
       {/* Crear Movimiento */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Crear Nuevo Movimiento</h2>
-        <div className="flex gap-4 items-end">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Sucursal
-            </label>
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className={isMobile ? "w-full" : "w-auto flex-1"}>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal</label>
             <select
               value={selectedSucursal}
               onChange={(e) => setSelectedSucursal(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={
+                (isMobile ? "w-full" : "w-auto") +
+                " border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              }
             >
               <option value="">Seleccionar sucursal</option>
               {sucursales.map((sucursal) => (
@@ -174,46 +183,80 @@ export default function ExampleComponent({}: ExampleComponentProps) {
         <h2 className="text-xl font-semibold mb-4">
           Movimientos Recientes ({movimientos.length})
         </h2>
-        
         {movimientos.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            No hay movimientos registrados
-          </div>
+          <div className="text-center py-8 text-gray-500">No hay movimientos registrados</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Folio</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Sucursal</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Fecha</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Movimiento</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Incidencia</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {movimientos.map((movimiento) => (
-                  <tr key={movimiento.folio} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 text-sm text-gray-900">
-                      {movimiento.folio}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-900">
-                      {getSucursalName(movimiento.sucursal)}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-900">
-                      {movimiento.fecha}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-900">
+          isMobile ? (
+            <div className="flex flex-col gap-4">
+              {movimientos.map((movimiento) => (
+                <div
+                  key={movimiento.folio}
+                  className="bg-white shadow-md rounded-xl p-4 flex flex-col gap-2"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-gray-800 text-lg">{getSucursalName(movimiento.sucursal)}</span>
+                    <span
+                      className={
+                        movimiento.movimiento === "Apertura"
+                          ? "inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold"
+                          : "inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold"
+                      }
+                    >
+                      {movimiento.movimiento === "Apertura" ? "📦" : "🔒"}
                       {movimiento.movimiento}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-gray-900">
-                      {movimiento.incidencia}
-                    </td>
+                    </span>
+                  </div>
+                  <div className="flex gap-4 text-sm text-gray-600">
+                    <div>
+                      <span className="font-medium">Fecha:</span> {movimiento.fecha}
+                    </div>
+                    <div>
+                      <span className="font-medium">Hora:</span> {movimiento.hora || "--:--:--"}
+                    </div>
+                  </div>
+                  {movimiento.incidencia && (
+                    <div className="text-xs text-gray-500"><span className="font-medium">Incidencia:</span> {movimiento.incidencia}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full table-auto">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Folio</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Sucursal</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Fecha</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Movimiento</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Incidencia</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {movimientos.map((movimiento) => (
+                    <tr key={movimiento.folio} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-sm text-gray-900">{movimiento.folio}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{getSucursalName(movimiento.sucursal)}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{movimiento.fecha}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">
+                        <span
+                          className={
+                            movimiento.movimiento === "Apertura"
+                              ? "inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold"
+                              : "inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold"
+                          }
+                        >
+                          {movimiento.movimiento === "Apertura" ? "📦" : "🔒"}
+                          {movimiento.movimiento}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{movimiento.incidencia}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         )}
       </div>
     </div>

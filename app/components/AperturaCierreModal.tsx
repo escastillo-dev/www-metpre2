@@ -173,39 +173,87 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
     { value: 'M', label: 'Mal', color: '#e53e3e', emoji: '❌' }
   ];
 
+  // Responsive modal logic
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Responsive styles solo para móvil
+  const isMobile = windowWidth < 768;
+  const modalStyle: React.CSSProperties = isMobile ? {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '8px',
+    overflowY: 'auto'
+  } : {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '20px',
+    overflowY: 'auto'
+  };
+  const cardStyle: React.CSSProperties = isMobile ? {
+    background: 'white',
+    borderRadius: '16px',
+    width: '95%',
+    maxWidth: '98vw',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 5px 15px rgba(0,0,0,0.08)'
+  } : {
+    background: 'white',
+    borderRadius: '16px',
+    width: '100%',
+    maxWidth: '900px',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column'
+  };
+  const stepperPadding = isMobile ? '12px 10px' : '24px 32px';
+  const stepperFont = isMobile ? '12px' : '16px';
+  const stepperCircle = isMobile ? '28px' : '40px';
+  const stepperMarginBottom = isMobile ? '18px' : '32px';
+  const stepperPaddingTop = isMobile ? '10px' : '24px';
+  const gridColumns1 = isMobile ? 1 : 2;
+  const gridColumns2 = isMobile ? 1 : 3;
+  const gridGap = isMobile ? '12px' : '20px';
+  const inputHeight = isMobile ? '48px' : '40px';
+  const buttonStack = isMobile ? 'column' : 'row';
+  const buttonGap = isMobile ? '8px' : '12px';
+
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: '20px'
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: '16px',
-        width: '100%',
-        maxWidth: '900px',
-        maxHeight: '90vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+    <div style={modalStyle}>
+      <div style={cardStyle}>
         {/* Header */}
         <div style={{
           background: tipo === 'apertura' 
             ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
             : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
           color: 'white',
-          padding: '24px 32px',
+          padding: stepperPadding,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -244,8 +292,8 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'space-between',
-            marginBottom: '32px',
-            paddingTop: '24px'
+            marginBottom: stepperMarginBottom,
+            paddingTop: stepperPaddingTop
           }}>
             {[1, 2, 3].map((step) => (
               <div key={step} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
@@ -280,10 +328,11 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
           {/* Step Labels */}
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '20px',
-            marginBottom: '32px',
-            textAlign: 'center'
+            gridTemplateColumns: `repeat(3, 1fr)`,
+            gap: gridGap,
+            marginBottom: stepperMarginBottom,
+            textAlign: 'center',
+            fontSize: stepperFont
           }}>
             <div>
               <div style={{ fontWeight: '600', color: currentStep >= 1 ? '#2d3748' : '#a0aec0' }}>
@@ -307,8 +356,8 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
         <div style={{ 
           flex: 1, 
           overflowY: 'auto', 
-          padding: '0 32px',
-          marginBottom: '24px'
+          padding: windowWidth < 768 ? '0 8px' : windowWidth < 1024 ? '0 16px' : '0 32px',
+          marginBottom: windowWidth < 768 ? '12px' : '24px'
         }}>
           {/* Step 1: Basic Information */}
           {currentStep === 1 && (
@@ -316,151 +365,291 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
               <h3 style={{ color: '#2d3748', marginBottom: '25px', fontSize: '20px' }}>
                 📋 Información General
               </h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                    Sucursal *
-                  </label>
-                  <select
-                    value={formData.sucursal}
-                    onChange={e => setFormData({...formData, sucursal: e.target.value})}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  >
-                    <option value="">Selecciona una sucursal</option>
-                    {sucursalesAsignadas.map(sucursal => (
-                      <option key={sucursal.idCentro} value={sucursal.idCentro}>
-                        {sucursal.Sucursal}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                    Fecha *
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.fecha}
-                    onChange={e => setFormData({...formData, fecha: e.target.value})}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                    Hora de Inicio *
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.horaInicio}
-                    onChange={e => setFormData({...formData, horaInicio: e.target.value})}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                    Hora de Fin
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.horaFin}
-                    onChange={e => setFormData({...formData, horaFin: e.target.value})}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                    Anfitrión *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.anfitrion}
-                    onChange={e => setFormData({...formData, anfitrion: e.target.value})}
-                    required
-                    placeholder="Nombre del anfitrión"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                    Plantilla
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.plantilla}
-                    onChange={e => setFormData({...formData, plantilla: e.target.value})}
-                    placeholder="Número de plantilla"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                    Candados
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.candados || ''}
-                    onChange={e => setFormData({...formData, candados: parseInt(e.target.value) || 0})}
-                    min="0"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-              </div>
+              {isMobile ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Sucursal *
+                      </label>
+                      <select
+                        value={formData.sucursal}
+                        onChange={e => setFormData({...formData, sucursal: e.target.value})}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="">Selecciona una sucursal</option>
+                        {sucursalesAsignadas.map(sucursal => (
+                          <option key={sucursal.idCentro} value={sucursal.idCentro}>
+                            {sucursal.Sucursal}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Fecha *
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.fecha}
+                        onChange={e => setFormData({...formData, fecha: e.target.value})}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Hora de Inicio *
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.horaInicio}
+                        onChange={e => setFormData({...formData, horaInicio: e.target.value})}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Hora de Fin
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.horaFin}
+                        onChange={e => setFormData({...formData, horaFin: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Anfitrión *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.anfitrion}
+                        onChange={e => setFormData({...formData, anfitrion: e.target.value})}
+                        required
+                        placeholder="Nombre del anfitrión"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Plantilla
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.plantilla}
+                        onChange={e => setFormData({...formData, plantilla: e.target.value})}
+                        placeholder="Número de plantilla"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          height: inputHeight,
+                          minHeight: inputHeight
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Candados
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.candados || ''}
+                        onChange={e => setFormData({...formData, candados: parseInt(e.target.value) || 0})}
+                        min="0"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '20px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Sucursal *
+                      </label>
+                      <select
+                        value={formData.sucursal}
+                        onChange={e => setFormData({...formData, sucursal: e.target.value})}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="">Selecciona una sucursal</option>
+                        {sucursalesAsignadas.map(sucursal => (
+                          <option key={sucursal.idCentro} value={sucursal.idCentro}>
+                            {sucursal.Sucursal}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Fecha *
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.fecha}
+                        onChange={e => setFormData({...formData, fecha: e.target.value})}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '20px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Hora de Inicio *
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.horaInicio}
+                        onChange={e => setFormData({...formData, horaInicio: e.target.value})}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Hora de Fin
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.horaFin}
+                        onChange={e => setFormData({...formData, horaFin: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Anfitrión *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.anfitrion}
+                        onChange={e => setFormData({...formData, anfitrion: e.target.value})}
+                        required
+                        placeholder="Nombre del anfitrión"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Plantilla
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.plantilla}
+                        onChange={e => setFormData({...formData, plantilla: e.target.value})}
+                        placeholder="Número de plantilla"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
+                        Candados
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.candados || ''}
+                        onChange={e => setFormData({...formData, candados: parseInt(e.target.value) || 0})}
+                        min="0"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -504,8 +693,9 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                     background: 'white',
                     border: '2px solid #e2e8f0',
                     borderRadius: '12px',
-                    padding: '20px',
-                    boxShadow: equipmentEvaluations[equipment.id]?.status ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none'
+                    padding: windowWidth < 768 ? '12px' : '20px',
+                    boxShadow: equipmentEvaluations[equipment.id]?.status ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none',
+                    marginBottom: windowWidth < 768 ? '8px' : '0'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
                       <span style={{ fontSize: '28px' }}>{equipment.icon}</span>
@@ -555,13 +745,13 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            padding: '12px 16px',
+                            padding: windowWidth < 768 ? '10px 8px' : '12px 16px',
                             border: `2px solid ${equipmentEvaluations[equipment.id]?.status === status.value ? status.color : '#e2e8f0'}`,
                             borderRadius: '8px',
                             cursor: 'pointer',
                             background: equipmentEvaluations[equipment.id]?.status === status.value ? `${status.color}15` : 'white',
                             transition: 'all 0.2s ease',
-                            fontSize: '14px',
+                            fontSize: windowWidth < 768 ? '13px' : '14px',
                             fontWeight: '500'
                           }}>
                             <input
@@ -595,7 +785,8 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                           border: '1px solid #e2e8f0', 
                           borderRadius: '8px', 
                           resize: 'vertical',
-                          fontSize: '14px'
+                          fontSize: windowWidth < 768 ? '13px' : '14px',
+                          minHeight: windowWidth < 768 ? '48px' : '40px'
                         }}
                       />
                     </div>
@@ -671,86 +862,86 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
 
         {/* Footer with buttons */}
         <div style={{ 
-          borderTop: '1px solid #e2e8f0',
-          padding: '24px 32px',
-          background: '#f9fafb'
+          padding: windowWidth < 768 ? '16px 10px' : '24px 32px',
+          background: '#f9fafb',
         }}>
-          <div style={{ display: 'flex', gap: '15px', justifyContent: 'space-between', alignItems: 'center' }}>
-            {/* Back button */}
+          <div style={{ display: buttonStack, gap: buttonGap, justifyContent: 'flex-end', alignItems: 'center' }}>
             <button
               onClick={handlePrev}
               disabled={currentStep === 1}
               style={{
-                padding: '12px 24px',
+                padding: windowWidth < 768 ? '12px' : '12px 24px',
                 border: '1px solid #e2e8f0',
                 borderRadius: '8px',
                 background: currentStep === 1 ? '#f7fafc' : 'white',
                 color: currentStep === 1 ? '#a0aec0' : '#4a5568',
                 cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
-                fontWeight: '500'
+                fontWeight: '500',
+                width: windowWidth < 768 ? '100%' : undefined
               }}
             >
               ← Anterior
             </button>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={onClose}
+              style={{
+                padding: windowWidth < 768 ? '12px' : '12px 24px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                background: 'white',
+                color: '#4a5568',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                width: windowWidth < 768 ? '100%' : undefined
+              }}
+            >
+              Cancelar
+            </button>
+
+            {currentStep < totalSteps ? (
               <button
-                onClick={onClose}
+                onClick={handleNext}
+                disabled={!validateCurrentStep()}
                 style={{
-                  padding: '12px 24px',
-                  border: '1px solid #e2e8f0',
+                  padding: windowWidth < 768 ? '12px' : '12px 24px',
+                  border: 'none',
                   borderRadius: '8px',
-                  background: 'white',
-                  color: '#4a5568',
-                  cursor: 'pointer',
+                  background: validateCurrentStep() 
+                    ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
+                    : '#e2e8f0',
+                  color: validateCurrentStep() ? 'white' : '#a0aec0',
+                  cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
                   fontSize: '14px',
-                  fontWeight: '500'
+                  fontWeight: '500',
+                  width: windowWidth < 768 ? '100%' : undefined
                 }}
               >
-                Cancelar
+                Siguiente →
               </button>
-
-              {currentStep < totalSteps ? (
-                <button
-                  onClick={handleNext}
-                  disabled={!validateCurrentStep()}
-                  style={{
-                    padding: '12px 24px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    background: validateCurrentStep() 
-                      ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
-                      : '#e2e8f0',
-                    color: validateCurrentStep() ? 'white' : '#a0aec0',
-                    cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  Siguiente →
-                </button>
-              ) : (
-                <button
-                  onClick={handleSubmit}
-                  disabled={!validateCurrentStep()}
-                  style={{
-                    padding: '12px 24px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    background: validateCurrentStep() 
-                      ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
-                      : '#e2e8f0',
-                    color: validateCurrentStep() ? 'white' : '#a0aec0',
-                    cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  ✅ Registrar {tipo === 'apertura' ? 'Apertura' : 'Cierre'}
-                </button>
-              )}
-            </div>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={!validateCurrentStep()}
+                style={{
+                  padding: windowWidth < 768 ? '12px' : '12px 24px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  background: validateCurrentStep() 
+                    ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
+                    : '#e2e8f0',
+                  color: validateCurrentStep() ? 'white' : '#a0aec0',
+                  cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  width: windowWidth < 768 ? '100%' : undefined
+                }}
+              >
+                ✅ Registrar {tipo === 'apertura' ? 'Apertura' : 'Cierre'}
+              </button>
+            )}
           </div>
         </div>
       </div>

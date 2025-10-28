@@ -5,6 +5,9 @@ import axios from 'axios';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 
+// URL de la API - usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 ChartJS.register(
   ArcElement,
   Tooltip,
@@ -84,7 +87,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ userLevel }) => {
         console.log('Headers a enviar:', headers);
 
         // Realizar la petición directamente a la URL completa
-        const response = await axios.get('http://127.0.0.1:8000/stats/dashboard', { 
+        const response = await axios.get(`${API_URL}/stats/dashboard`, { 
           headers,
           withCredentials: true
         });
@@ -159,7 +162,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ userLevel }) => {
       };
 
       // Obtener sucursales del usuario
-      const userResponse = await axios.get(`http://127.0.0.1:8000/usuarios/${userId}`, { headers });
+      const userResponse = await axios.get(`${API_URL}/usuarios/${userId}`, { headers });
       
       if (userResponse.data.estatus !== 1 || !userResponse.data.sucursales) {
         console.error('No se pudieron obtener las sucursales del usuario');
@@ -171,7 +174,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ userLevel }) => {
       const sucursalesIds = sucursales.map((s: any) => s.idCentro).join(',');
 
       // Obtener mermas de las sucursales del usuario
-      const mermasResponse = await axios.get(`http://127.0.0.1:8000/mermas/sucursales/${sucursalesIds}`, { headers });
+      const mermasResponse = await axios.get(`${API_URL}/mermas/sucursales/${sucursalesIds}`, { headers });
       
       if (mermasResponse.data.estatus === 1) {
         const mermas = mermasResponse.data.mermas || [];
@@ -188,7 +191,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ userLevel }) => {
         let totalPerdidas = 0;
         for (const merma of mermas) {
           try {
-            const productosResponse = await axios.get(`http://127.0.0.1:8000/mermas/${merma.idMaMe}/productos`, { headers });
+            const productosResponse = await axios.get(`${API_URL}/mermas/${merma.idMaMe}/productos`, { headers });
             if (productosResponse.data.estatus === 1) {
               const productos = productosResponse.data.productos || [];
               const valorMerma = productos.reduce((suma: number, producto: any) => {
@@ -333,157 +336,54 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ userLevel }) => {
   }
 
   return (
-    <div className="dashboard-overview" style={{
-      padding: '2rem',
-      maxWidth: '1400px',
-      margin: '0 auto',
-    }}>
-      <div className="stats-header" style={{
-        marginBottom: '2rem',
-      }}>
-        {/* Grid de Métricas Principales */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem'
-        }}>
+    <div className="dashboard-overview w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="stats-header mb-8">
+        {/* Grid de Métricas Principales - RESPONSIVE: 1 col móvil, 2 tablet, 3 desktop */}
+        <div className="stats-grid">
           {/* Total Usuarios */}
-          <div className="stat-card" style={{
-            backgroundColor: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-            textAlign: 'center',
-            border: '1px solid #e2e8f0'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <h3 style={{ 
-                margin: 0, 
-                color: '#2368b3',
-                fontSize: '1rem',
-                fontWeight: '600'
-              }}>Total Usuarios</h3>
-              <div style={{ 
-                background: 'rgba(35, 104, 179, 0.1)', 
-                color: '#2368b3', 
-                borderRadius: '8px', 
-                padding: '8px', 
-                fontSize: '20px' 
-              }}>👥</div>
+          <div className="stat-card bg-white p-4 sm:p-6 rounded-xl shadow-md text-center border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="m-0 text-blue-600 text-base font-semibold">Total Usuarios</h3>
+              <div className="bg-blue-50 text-blue-600 rounded-lg p-2 text-xl">👥</div>
             </div>
-            <p style={{ 
-              fontSize: '2.5rem', 
-              margin: 0, 
-              color: '#333',
-              fontWeight: 'bold'
-            }}>{stats.totalUsuarios}</p>
-            <span style={{ fontSize: '0.875rem', color: '#666' }}>Usuarios activos</span>
+            <p className="text-4xl m-0 text-gray-800 font-bold">{stats.totalUsuarios}</p>
+            <span className="text-sm text-gray-600">Usuarios activos</span>
           </div>
 
           {/* Total Pérdidas */}
-          <div className="stat-card" style={{
-            backgroundColor: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-            textAlign: 'center',
-            border: '1px solid #e2e8f0'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <h3 style={{ 
-                margin: 0, 
-                color: '#e53e3e',
-                fontSize: '1rem',
-                fontWeight: '600'
-              }}>Pérdidas Totales</h3>
-              <div style={{ 
-                background: 'rgba(229, 62, 62, 0.1)', 
-                color: '#e53e3e', 
-                borderRadius: '8px', 
-                padding: '8px', 
-                fontSize: '20px' 
-              }}>💰</div>
+          <div className="stat-card bg-white p-4 sm:p-6 rounded-xl shadow-md text-center border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="m-0 text-red-600 text-base font-semibold">Pérdidas Totales</h3>
+              <div className="bg-red-50 text-red-600 rounded-lg p-2 text-xl">💰</div>
             </div>
-            <p style={{ 
-              fontSize: '2rem', 
-              margin: 0, 
-              color: '#e53e3e',
-              fontWeight: 'bold'
-            }}>
+            <p className="text-3xl m-0 text-red-600 font-bold">
               {loadingMermas ? '...' : `$${mermasStats.totalPerdidas.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </p>
-            <span style={{ fontSize: '0.875rem', color: '#666' }}>Valor en dinero</span>
+            <span className="text-sm text-gray-600">Valor en dinero</span>
           </div>
 
           {/* Total Mermas */}
-          <div className="stat-card" style={{
-            backgroundColor: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-            textAlign: 'center',
-            border: '1px solid #e2e8f0'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <h3 style={{ 
-                margin: 0, 
-                color: '#f5942b',
-                fontSize: '1rem',
-                fontWeight: '600'
-              }}>Total Mermas</h3>
-              <div style={{ 
-                background: 'rgba(245, 148, 43, 0.1)', 
-                color: '#f5942b', 
-                borderRadius: '8px', 
-                padding: '8px', 
-                fontSize: '20px' 
-              }}>📊</div>
+          <div className="stat-card bg-white p-4 sm:p-6 rounded-xl shadow-md text-center border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="m-0 text-orange-500 text-base font-semibold">Total Mermas</h3>
+              <div className="bg-orange-50 text-orange-500 rounded-lg p-2 text-xl">📊</div>
             </div>
-            <p style={{ 
-              fontSize: '2.5rem', 
-              margin: 0, 
-              color: '#333',
-              fontWeight: 'bold'
-            }}>
+            <p className="text-4xl m-0 text-gray-800 font-bold">
               {loadingMermas ? '...' : mermasStats.totalMermas}
             </p>
-            <span style={{ fontSize: '0.875rem', color: '#666' }}>Registros totales</span>
+            <span className="text-sm text-gray-600">Registros totales</span>
           </div>
 
           {/* Mermas del Mes */}
-          <div className="stat-card" style={{
-            backgroundColor: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-            textAlign: 'center',
-            border: '1px solid #e2e8f0'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <h3 style={{ 
-                margin: 0, 
-                color: '#38a169',
-                fontSize: '1rem',
-                fontWeight: '600'
-              }}>Mermas del Mes</h3>
-              <div style={{ 
-                background: 'rgba(56, 161, 105, 0.1)', 
-                color: '#38a169', 
-                borderRadius: '8px', 
-                padding: '8px', 
-                fontSize: '20px' 
-              }}>📈</div>
+          <div className="stat-card bg-white p-4 sm:p-6 rounded-xl shadow-md text-center border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="m-0 text-green-600 text-base font-semibold">Mermas del Mes</h3>
+              <div className="bg-green-50 text-green-600 rounded-lg p-2 text-xl">📈</div>
             </div>
-            <p style={{ 
-              fontSize: '2.5rem', 
-              margin: 0, 
-              color: '#333',
-              fontWeight: 'bold'
-            }}>
+            <p className="text-4xl m-0 text-gray-800 font-bold">
               {loadingMermas ? '...' : mermasStats.mermasMes}
             </p>
-            <span style={{ fontSize: '0.875rem', color: '#666' }}>Este mes</span>
+            <span className="text-sm text-gray-600">Este mes</span>
           </div>
         </div>
       </div>
@@ -594,26 +494,12 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ userLevel }) => {
         </div>
       )}
 
-      <div className="charts-grid" style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '2rem',
-        marginTop: '2rem',
-      }}>
-        <div className="chart-container" style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        }}>
-          <h3 style={{ 
-            margin: '0 0 1.5rem 0', 
-            color: '#2368b3',
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-            textAlign: 'center'
-          }}>Distribución por Zona</h3>
-          <div style={{ height: '400px', position: 'relative' }}>
+      <div className="charts-grid grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 mt-8">
+        <div className="chart-container bg-white p-4 sm:p-8 rounded-xl shadow-md">
+          <h3 className="m-0 mb-4 sm:mb-6 text-blue-600 text-lg sm:text-2xl font-bold text-center">
+            Distribución por Zona
+          </h3>
+          <div className="h-64 sm:h-80 lg:h-96 relative">
             <Pie 
               data={zonasChartData} 
               options={zonasChartOptions} 
@@ -621,20 +507,11 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({ userLevel }) => {
           </div>
         </div>
 
-        <div className="chart-container" style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '12px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-        }}>
-          <h3 style={{ 
-            margin: '0 0 1.5rem 0', 
-            color: '#2368b3',
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-            textAlign: 'center'
-          }}>Usuarios por Nivel</h3>
-          <div style={{ height: '400px', position: 'relative' }}>
+        <div className="chart-container bg-white p-4 sm:p-8 rounded-xl shadow-md">
+          <h3 className="m-0 mb-4 sm:mb-6 text-blue-600 text-lg sm:text-2xl font-bold text-center">
+            Usuarios por Nivel
+          </h3>
+          <div className="h-64 sm:h-80 lg:h-96 relative">
             <Bar 
               data={nivelesChartData}
               options={{

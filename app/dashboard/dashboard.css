@@ -12,8 +12,10 @@ body {
 .dashboard-container {
     display: flex;
     height: 100vh;
+    position: relative;
 }
 
+/* ========== SIDEBAR RESPONSIVE ========== */
 .sidebar {
     width: 280px;
     background: linear-gradient(180deg, #2368b3 0%, #1a5490 100%);
@@ -22,8 +24,8 @@ body {
     flex-direction: column;
     box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
     position: relative;
-    z-index: 10;
-    transition: width 0.3s ease;
+    z-index: 1000;
+    transition: all 0.3s ease;
 }
 
 .sidebar.collapsed {
@@ -353,4 +355,280 @@ select:focus {
     outline: none;
     border-color: #2368b3;
     box-shadow: 0 0 0 3px rgba(35, 104, 179, 0.1);
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+
+/* Overlay para móvil cuando el sidebar está abierto */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Botón hamburguesa - solo visible en móvil */
+.mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1001;
+    background: #2368b3;
+    border: none;
+    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-toggle:hover {
+    background: #1a5490;
+    transform: scale(1.05);
+}
+
+.mobile-menu-toggle:active {
+    transform: scale(0.95);
+}
+
+/* Estilos base para móviles */
+@media (max-width: 767px) {
+    body {
+        overflow-y: auto;
+        height: auto;
+    }
+
+    .dashboard-container {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+    }
+
+    /* Botón hamburguesa visible en móvil */
+    .mobile-menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Sidebar en móvil */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: -100%;
+        width: 280px;
+        height: 100vh;
+        z-index: 1000;
+        transition: left 0.3s ease;
+        overflow-y: auto;
+    }
+
+    .sidebar.open {
+        left: 0;
+    }
+
+    /* Ocultar el toggle interno del sidebar en móvil */
+    .sidebar-toggle {
+        display: none;
+    }
+
+    .sidebar.collapsed {
+        left: -100%;
+        width: 280px;
+    }
+
+    .sidebar.collapsed .nav-menu {
+        display: flex;
+    }
+
+    .sidebar.collapsed .user-details,
+    .sidebar.collapsed .company-name {
+        display: flex;
+    }
+
+    .sidebar-header {
+        padding: 15px 20px;
+    }
+
+    .logo-section {
+        gap: 10px;
+    }
+
+    .company-name {
+        font-size: 1.25rem;
+    }
+
+    .logo-icon {
+        min-width: 40px;
+        height: 40px;
+    }
+
+    .user-info {
+        padding: 10px 20px;
+        margin-top: 5px;
+    }
+
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .user-name {
+        font-size: 14px;
+    }
+
+    .user-role {
+        font-size: 12px;
+    }
+
+    .nav-item {
+        padding: 12px 20px;
+    }
+
+    /* Main content ocupa todo el ancho en móvil */
+    .main-content {
+        width: 100%;
+        margin-top: 70px; /* Espacio para el botón hamburguesa */
+    }
+
+    .top-bar {
+        padding: 15px 20px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .page-title {
+        font-size: 22px;
+    }
+
+    .content-area {
+        padding: 20px 15px;
+    }
+
+    /* Hacer tablas scrollables en móviles */
+    .data-table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -15px;
+        padding: 0 15px;
+    }
+
+    .data-table {
+        min-width: 600px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 12px 15px;
+        font-size: 14px;
+    }
+
+    .search-input {
+        font-size: 16px; /* Evita zoom automático en iOS */
+        padding: 14px 16px;
+    }
+
+    .pagination-container {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .pagination-info {
+        text-align: center;
+    }
+
+    .pagination-controls {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .pagination-controls button {
+        padding: 0.75rem 1rem;
+        min-height: 44px; /* Touch-friendly */
+    }
+
+    select {
+        padding: 0.75rem;
+        min-height: 44px;
+        font-size: 16px;
+    }
+}
+
+/* Estilos para tablets */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .sidebar {
+        width: 240px;
+    }
+
+    .sidebar.collapsed {
+        width: 70px;
+    }
+
+    .sidebar-toggle {
+        display: flex;
+    }
+
+    .mobile-menu-toggle {
+        display: none;
+    }
+
+    .main-content {
+        margin-top: 0;
+    }
+
+    .content-area {
+        padding: 25px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 12px 20px;
+    }
+}
+
+/* Estilos para pantallas grandes (Desktop) */
+@media (min-width: 1024px) {
+    .dashboard-container {
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    .sidebar {
+        position: relative;
+        left: 0;
+    }
+
+    .sidebar-toggle {
+        display: flex;
+    }
+
+    .mobile-menu-toggle {
+        display: none;
+    }
+
+    .sidebar-overlay {
+        display: none !important;
+    }
+
+    .main-content {
+        margin-top: 0;
+    }
 }

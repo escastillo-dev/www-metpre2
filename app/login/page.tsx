@@ -8,6 +8,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState(""); // Contraseña
   const [error, setError] = useState(""); // Mensaje de error
 
+  // URL de la API - usar variable de entorno o fallback a localhost
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); // Limpiar errores previos
@@ -26,7 +29,7 @@ export default function LoginPage() {
     try {
       // Enviar solicitud a la API
       const response = await axios.post(
-        "http://127.0.0.1:8000/usuarios/autenticar",
+        `${API_URL}/usuarios/autenticar`,
         {
           idUsuarios: parseInt(nomina),
           pwd: password,
@@ -51,7 +54,7 @@ export default function LoginPage() {
           const token = response.data.token;
           
           // Obtener el nombre del nivel desde la API de niveles
-          const nivelResponse = await axios.get('http://127.0.0.1:8000/niveles-usuario', {
+          const nivelResponse = await axios.get(`${API_URL}/niveles-usuario`, {
             headers: {
               'Authorization': `Basic ${credentials}`,
               'Content-Type': 'application/json'

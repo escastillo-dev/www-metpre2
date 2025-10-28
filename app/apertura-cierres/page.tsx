@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
+// URL de la API - usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 interface Equipment {
   id: string;
   name: string;
@@ -125,7 +128,7 @@ export default function AperturaCierresPage() {
         return;
       }
 
-      const response = await axios.get('http://127.0.0.1:8000/apci/consultar', {
+      const response = await axios.get(`${API_URL}/apci/consultar`, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Basic ${userCredentials}`,
@@ -193,7 +196,7 @@ export default function AperturaCierresPage() {
         return;
       }
 
-      const response = await axios.get<UsuarioResponse>(`http://127.0.0.1:8000/usuarios/${userId}`, {
+      const response = await axios.get<UsuarioResponse>(`${API_URL}/usuarios/${userId}`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -371,7 +374,7 @@ export default function AperturaCierresPage() {
       console.log('Enviando datos a la API:', apiData);
 
       // Enviar datos a la API
-      const response = await axios.post('http://127.0.0.1:8000/apci', apiData, {
+      const response = await axios.post(`${API_URL}/apci`, apiData, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Basic ${userCredentials}`,

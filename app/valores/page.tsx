@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
+// URL de la API - usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 interface MovimientoAPI {
   Folio: number;
   Sucursales: string;
@@ -105,7 +108,7 @@ export default function ValoresPage() {
         hora = hora + ':00';
       }
       const response = await axios.post(
-        'http://127.0.0.1:8000/mmv/movimientos',
+        `${API_URL}/mmv/movimientos`,
         {
           ...formData,
           idUsuarios: parseInt(userId),
@@ -168,7 +171,7 @@ export default function ValoresPage() {
         return;
       }
 
-      const response = await axios.get<UsuarioResponse>(`http://127.0.0.1:8000/usuarios/${userId}`, {
+      const response = await axios.get<UsuarioResponse>(`${API_URL}/usuarios/${userId}`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -206,7 +209,7 @@ export default function ValoresPage() {
         return;
       }
 
-      const response = await axios.get('http://127.0.0.1:8000/Incidencias', {
+      const response = await axios.get(`${API_URL}/Incidencias`, {
         params: { limit: 50, offset: 0 },
         headers: {
           'Authorization': `Basic ${userCredentials}`,
@@ -258,7 +261,7 @@ export default function ValoresPage() {
       }
 
       // Construir URL con parámetros de consulta
-      let url = `http://127.0.0.1:8000/mmv/movimientos?limit=${limit}&offset=${offset}`;
+      let url = `${API_URL}/mmv/movimientos?limit=${limit}&offset=${offset}`;
       
       // Agregar los IDs de las sucursales asignadas
       const sucursalesIds = sucursalesAsignadas.map(s => s.idCentro).join(',');

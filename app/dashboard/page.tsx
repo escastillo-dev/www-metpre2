@@ -12,6 +12,9 @@ import ValoresContent from '../components/ValoresContent';
 import AperturaCierresContent from '../components/AperturaCierresContent';
 import MermasContent from '../components/MermasContent';
 
+// URL de la API - usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 interface User {
   idUsuarios: number;
   NombreUsuario: string;
@@ -42,6 +45,7 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isMenuCollapsed, setIsMenuCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [activePanel, setActivePanel] = useState('dashboard');
   const [userName, setUserName] = useState('');
   const [userLevel, setUserLevel] = useState('');
@@ -136,7 +140,7 @@ function DashboardContent() {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`http://127.0.0.1:8000/usuarios?limit=${limit}&offset=${offset}`, {
+      const response = await axios.get(`${API_URL}/usuarios?limit=${limit}&offset=${offset}`, {
         headers: {
           'Authorization': `Basic ${localStorage.getItem('userCredentials')}`,
         },
@@ -150,7 +154,7 @@ function DashboardContent() {
 
   const fetchUserLevels = async () => {
     try {
-      const response = await axios.get('http://127.0.0.1:8000/niveles-usuario', {
+      const response = await axios.get(`${API_URL}/niveles-usuario`, {
         headers: {
           'Authorization': `Basic ${localStorage.getItem('userCredentials')}`,
         },
@@ -171,7 +175,7 @@ function DashboardContent() {
         return;
       }
 
-      const response = await axios.get('http://127.0.0.1:8000/zonas', {
+      const response = await axios.get(`${API_URL}/zonas`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -207,7 +211,7 @@ function DashboardContent() {
       }
 
       // Construir la URL base
-      let url = `http://127.0.0.1:8000/usuarios/${assigningUser.idUsuarios}/sucursales-disponibles`;
+      let url = `${API_URL}/usuarios/${assigningUser.idUsuarios}/sucursales-disponibles`;
       
       // Si se seleccionó una zona específica, agregar el parámetro idZona
       if (zonaId !== 0) {
@@ -288,7 +292,7 @@ function DashboardContent() {
     
     try {
       const response = await axios.put(
-        `http://127.0.0.1:8000/usuarios/${editingUser.idUsuarios}`,
+       `${API_URL}/usuarios/${editingUser.idUsuarios}`,
         {
           NombreUsuario: editForm.NombreUsuario,
           idNivelUsuario: editForm.idNivelUsuario,
@@ -325,7 +329,7 @@ function DashboardContent() {
 
   const handleEditClick = async (user: User) => {
     try {
-      const response = await axios.get('http://127.0.0.1:8000/niveles-usuario', {
+      const response = await axios.get(`${API_URL}/niveles-usuario`, {
         headers: {
           'Authorization': `Basic ${localStorage.getItem('userCredentials')}`,
         },
@@ -356,9 +360,31 @@ function DashboardContent() {
     return <div>Cargando...</div>;
   }
 
+  // Función para cerrar el sidebar móvil al hacer clic en un nav-item
+  const handleNavClick = (panel: string, path: string) => {
+    setActivePanel(panel);
+    router.push(path);
+    setIsMobileSidebarOpen(false); // Cerrar sidebar en móvil
+  };
+
   return (
     <div className="dashboard-container">
-      <div className={`sidebar ${isMenuCollapsed ? 'collapsed' : ''}`}>
+      {/* Botón hamburguesa para móvil */}
+      <button 
+        className="mobile-menu-toggle"
+        onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        aria-label="Toggle menu"
+      >
+        {isMobileSidebarOpen ? '✕' : '☰'}
+      </button>
+
+      {/* Overlay oscuro para móvil */}
+      <div 
+        className={`sidebar-overlay ${isMobileSidebarOpen ? 'active' : ''}`}
+        onClick={() => setIsMobileSidebarOpen(false)}
+      />
+
+      <div className={`sidebar ${isMenuCollapsed ? 'collapsed' : ''} ${isMobileSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <button 
             className="sidebar-toggle" 
@@ -390,10 +416,7 @@ function DashboardContent() {
           <div className="nav-section">
             <div 
               className={`nav-item ${activePanel === 'dashboard' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('dashboard');
-                router.push('/dashboard');
-              }}
+              onClick={() => handleNavClick('dashboard', '/dashboard')}
             >
               <span className="nav-icon">🏠</span>
               {!isMenuCollapsed && <span className="nav-text">Dashboard</span>}
@@ -402,10 +425,7 @@ function DashboardContent() {
             {userLevel === 'Admin' && (
               <div 
                 className={`nav-item ${activePanel === 'users' ? 'active' : ''}`}
-                onClick={() => {
-                  setActivePanel('users');
-                  router.push('/dashboard?panel=users');
-                }}
+                onClick={() => handleNavClick('users', '/dashboard?panel=users')}
               >
                 <span className="nav-icon">👥</span>
                 {!isMenuCollapsed && <span className="nav-text">Usuarios</span>}
@@ -414,10 +434,7 @@ function DashboardContent() {
             
             <div 
               className={`nav-item ${activePanel === 'valores' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('valores');
-                router.push('/dashboard?panel=valores');
-              }}
+              onClick={() => handleNavClick('valores', '/dashboard?panel=valores')}
             >
               <span className="nav-icon">💰</span>
               {!isMenuCollapsed && <span className="nav-text">Manejo de Valores</span>}
@@ -425,10 +442,7 @@ function DashboardContent() {
 
             <div 
               className={`nav-item ${activePanel === 'apertura-cierres' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('apertura-cierres');
-                router.push('/dashboard?panel=apertura-cierres');
-              }}
+              onClick={() => handleNavClick('apertura-cierres', '/dashboard?panel=apertura-cierres')}
             >
               <span className="nav-icon">🌅</span>
               {!isMenuCollapsed && <span className="nav-text">Apertura y cierres</span>}
@@ -436,10 +450,7 @@ function DashboardContent() {
 
             <div 
               className={`nav-item ${activePanel === 'mermas' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('mermas');
-                router.push('/dashboard?panel=mermas');
-              }}
+              onClick={() => handleNavClick('mermas', '/dashboard?panel=mermas')}
             >
               <span className="nav-icon">📉</span>
               {!isMenuCollapsed && <span className="nav-text">Manejo de Mermas</span>}
@@ -560,7 +571,7 @@ function DashboardContent() {
                   }
                   try {
                     const response = await axios.post(
-                      `http://127.0.0.1:8000/usuarios/${assigningUser?.idUsuarios}/sucursales`,
+                     `${API_URL}/usuarios/${assigningUser?.idUsuarios}/sucursales`,
                       { idCentro: selectedSucursal },
                       {
                         headers: {

@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+// URL de la API - usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 interface Merma {
   idMaMe: number;
   idCentro: string;
@@ -80,7 +83,7 @@ export default function MermasContent() {
         return;
       }
 
-      const response = await axios.get(`http://127.0.0.1:8000/usuarios/${userId}`, {
+      const response = await axios.get(`${API_URL}/usuarios/${userId}`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -131,7 +134,7 @@ export default function MermasContent() {
       const sucursalesIds = sucursalesAsignadas.map(s => s.idCentro).join(',');
       console.log('IDs de sucursales para consultar:', sucursalesIds);
       
-      const url = `http://127.0.0.1:8000/mermas/sucursales/${sucursalesIds}`;
+      const url = `${API_URL}/mermas/sucursales/${sucursalesIds}`;
       console.log('URL a consultar:', url);
       
       // Llamar a la API real de mermas
@@ -200,7 +203,7 @@ export default function MermasContent() {
       for (const merma of records) {
         console.log(`Procesando merma ${merma.idMaMe}`);
         try {
-          const response = await axios.get(`http://127.0.0.1:8000/mermas/${merma.idMaMe}/productos`, {
+          const response = await axios.get(`${API_URL}/mermas/${merma.idMaMe}/productos`, {
             headers: {
               'Authorization': `Basic ${userCredentials}`,
               'Content-Type': 'application/json'
@@ -269,7 +272,7 @@ export default function MermasContent() {
       for (const merma of recordsFiltrados) {
         console.log(`Procesando merma filtrada ${merma.idMaMe}`);
         try {
-          const response = await axios.get(`http://127.0.0.1:8000/mermas/${merma.idMaMe}/productos`, {
+          const response = await axios.get(`${API_URL}/mermas/${merma.idMaMe}/productos`, {
             headers: {
               'Authorization': `Basic ${userCredentials}`,
               'Content-Type': 'application/json'
@@ -317,7 +320,7 @@ export default function MermasContent() {
         return;
       }
 
-      const response = await axios.get('http://127.0.0.1:8000/motivos-merma', {
+      const response = await axios.get(`${API_URL}/motivos-merma`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -348,7 +351,7 @@ export default function MermasContent() {
       const userCredentials = localStorage.getItem('userCredentials');
       if (!userCredentials) return;
 
-      const response = await axios.get(`http://127.0.0.1:8000/productos/buscar?q=${encodeURIComponent(termino)}`, {
+      const response = await axios.get(`${API_URL}/productos/buscar?q=${encodeURIComponent(termino)}`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -471,7 +474,7 @@ export default function MermasContent() {
         Anfitrion: nuevaMerma.Anfitrion // Número de nómina como string
       };
 
-      const response = await axios.post('http://127.0.0.1:8000/mermas', mermaData, {
+      const response = await axios.post(`${API_URL}/mermas`, mermaData, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -502,21 +505,21 @@ export default function MermasContent() {
         alert(`Error del servidor: ${response.data.mensaje}`);
       }
     } catch (error) {
-      console.error('Error completo:', error);
-      
-      if (error.response) {
+      const err = error as any;
+      console.error('Error completo:', err);
+      if (err && err.response) {
         // El servidor respondió con un código de error
-        console.error('Datos de error:', error.response.data);
-        console.error('Status:', error.response.status);
-        alert(`Error del servidor (${error.response.status}): ${error.response.data?.mensaje || 'Error desconocido'}`);
-      } else if (error.request) {
+        console.error('Datos de error:', err.response.data);
+        console.error('Status:', err.response.status);
+        alert(`Error del servidor (${err.response.status}): ${err.response.data?.mensaje || 'Error desconocido'}`);
+      } else if (err && err.request) {
         // La petición se hizo pero no hubo respuesta
         console.error('No se recibió respuesta del servidor');
         alert('Error de conexión: No se pudo conectar con el servidor');
       } else {
         // Error al configurar la petición
-        console.error('Error al configurar petición:', error.message);
-        alert(`Error: ${error.message}`);
+        console.error('Error al configurar petición:', err?.message);
+        alert(`Error: ${err?.message}`);
       }
     }
   };
@@ -554,7 +557,7 @@ export default function MermasContent() {
 
         console.log('Enviando producto:', productoData);
 
-        await axios.post(`http://127.0.0.1:8000/mermas/${mermaCreada.idMaMe}/productos`, productoData, {
+        await axios.post(`${API_URL}/mermas/${mermaCreada.idMaMe}/productos`, productoData, {
           headers: {
             'Authorization': `Basic ${userCredentials}`,
             'Content-Type': 'application/json'
@@ -575,8 +578,19 @@ export default function MermasContent() {
       fetchRegistrosMermas(); // Refrescar la tabla
       setStatsKey(prev => prev + 1); // Actualizar estadísticas
     } catch (error) {
-      console.error('Error al guardar productos:', error);
-      alert('Error al guardar los productos');
+      const err = error as any;
+      console.error('Error al guardar productos:', err);
+      if (err && err.response) {
+        console.error('Datos de error:', err.response.data);
+        console.error('Status:', err.response.status);
+        alert(`Error del servidor (${err.response.status}): ${err.response.data?.mensaje || 'Error desconocido'}`);
+      } else if (err && err.request) {
+        console.error('No se recibió respuesta del servidor');
+        alert('Error de conexión: No se pudo conectar con el servidor');
+      } else {
+        console.error('Error al configurar petición:', err?.message);
+        alert(`Error: ${err?.message}`);
+      }
     }
   };
 
@@ -630,7 +644,7 @@ export default function MermasContent() {
       setMermaDetalle(mermaInfo);
 
       // Obtener productos de la merma
-      const response = await axios.get(`http://127.0.0.1:8000/mermas/${mermaId}/productos`, {
+      const response = await axios.get(`${API_URL}/mermas/${mermaId}/productos`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -867,6 +881,8 @@ export default function MermasContent() {
       </div>
 
       {/* Tabla de Registros */}
+
+      {/* Responsive: Cards en móvil, tabla en desktop/tablet */}
       <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ margin: 0, color: '#2d3748' }}>Registros de Mermas</h3>
@@ -947,7 +963,6 @@ export default function MermasContent() {
               </button>
             )}
           </div>
-          
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, alignItems: 'center' }}>
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: '500', color: '#6c757d', marginBottom: 4 }}>
@@ -966,7 +981,6 @@ export default function MermasContent() {
                 }}
               />
             </div>
-            
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: '500', color: '#6c757d', marginBottom: 4 }}>
                 Fecha hasta:
@@ -984,7 +998,6 @@ export default function MermasContent() {
                 }}
               />
             </div>
-            
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: '500', color: '#6c757d', marginBottom: 4 }}>
                 Monto de alerta ($):
@@ -1004,7 +1017,6 @@ export default function MermasContent() {
                 }}
               />
             </div>
-
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#6c757d' }}>
               <span>📊</span>
               <span>
@@ -1016,87 +1028,161 @@ export default function MermasContent() {
             </div>
           </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f7fafc' }}>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>ID</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Sucursal</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Fecha</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Usuario</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Anfitrión</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Motivo</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loadingRecords ? (
-                <tr>
-                  <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                      Cargando registros...
-                    </div>
-                  </td>
+
+        {/* Responsive rendering */}
+        {typeof window !== 'undefined' && window.innerWidth < 768 ? (
+          loadingRecords ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                Cargando registros...
+              </div>
+            </div>
+          ) : getFilteredRecords().length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>
+              📉 No hay registros de mermas para mostrar
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 16 }}>
+              {getFilteredRecords().map(record => (
+                <div key={record.idMaMe} style={{
+                  background: '#fff',
+                  borderRadius: 12,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  border: '1px solid #e2e8f0',
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, color: '#2d3748', fontSize: 16 }}>#{record.idMaMe}</span>
+                    <span style={{ color: '#718096', fontSize: 13 }}>{formatDate(record.fecha)}</span>
+                  </div>
+                  <div style={{ color: '#2d3748', fontWeight: 600 }}>{record.nombreSucursal || getBranchName(record.idCentro)}</div>
+                  <div style={{ color: '#4a5568', fontSize: 13 }}>Usuario: {record.nombreUsuario || 'Usuario no encontrado'}</div>
+                  <div style={{ color: '#4a5568', fontSize: 13 }}>Anfitrión: {record.nombreAnfitrion}</div>
+                  <div style={{ color: '#4a5568', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.motivo}>
+                    Motivo: {record.motivo}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button 
+                      title="Ver Detalles" 
+                      onClick={() => handleVerDetalles(record.idMaMe)}
+                      style={{ 
+                        padding: '8px 16px', 
+                        background: '#2368b3', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: 8, 
+                        cursor: 'pointer', 
+                        fontSize: 14 
+                      }}
+                    >
+                      👁️ Ver
+                    </button>
+                    <button 
+                      title="Editar" 
+                      onClick={() => handleEditarMerma(record.idMaMe)}
+                      style={{ 
+                        padding: '8px 16px', 
+                        background: '#38a169', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: 8, 
+                        cursor: 'pointer', 
+                        fontSize: 14 
+                      }}
+                    >
+                      ✏️ Editar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#f7fafc' }}>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>ID</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Sucursal</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Fecha</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Usuario</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Anfitrión</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Motivo</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Acciones</th>
                 </tr>
-              ) : getFilteredRecords().length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>
-                    📉 No hay registros de mermas para mostrar
-                  </td>
-                </tr>
-              ) : (
-                getFilteredRecords().map(record => (
-                <tr key={record.idMaMe} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: 12, fontFamily: 'monospace' }}>{record.idMaMe}</td>
-                  <td style={{ padding: 12 }}>{record.nombreSucursal || getBranchName(record.idCentro)}</td>
-                  <td style={{ padding: 12 }}>{formatDate(record.fecha)}</td>
-                  <td style={{ padding: 12 }}>{record.nombreUsuario || 'Usuario no encontrado'}</td>
-                  <td style={{ padding: 12 }}>{record.nombreAnfitrion}</td>
-                  <td style={{ padding: 12 }}>
-                    <div style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.motivo}>
-                      {record.motivo}
-                    </div>
-                  </td>
-                  <td style={{ padding: 12 }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button 
-                        title="Ver Detalles" 
-                        onClick={() => handleVerDetalles(record.idMaMe)}
-                        style={{ 
-                          padding: '6px 12px', 
-                          background: '#2368b3', 
-                          color: 'white', 
-                          border: 'none', 
-                          borderRadius: 6, 
-                          cursor: 'pointer', 
-                          fontSize: 14 
-                        }}
-                      >
-                        👁️
-                      </button>
-                      <button 
-                        title="Editar" 
-                        onClick={() => handleEditarMerma(record.idMaMe)}
-                        style={{ 
-                          padding: '6px 12px', 
-                          background: '#38a169', 
-                          color: 'white', 
-                          border: 'none', 
-                          borderRadius: 6, 
-                          cursor: 'pointer', 
-                          fontSize: 14 
-                        }}
-                      >
-                        ✏️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {loadingRecords ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                        Cargando registros...
+                      </div>
+                    </td>
+                  </tr>
+                ) : getFilteredRecords().length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>
+                      📉 No hay registros de mermas para mostrar
+                    </td>
+                  </tr>
+                ) : (
+                  getFilteredRecords().map(record => (
+                    <tr key={record.idMaMe} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: 12, fontFamily: 'monospace' }}>{record.idMaMe}</td>
+                      <td style={{ padding: 12 }}>{record.nombreSucursal || getBranchName(record.idCentro)}</td>
+                      <td style={{ padding: 12 }}>{formatDate(record.fecha)}</td>
+                      <td style={{ padding: 12 }}>{record.nombreUsuario || 'Usuario no encontrado'}</td>
+                      <td style={{ padding: 12 }}>{record.nombreAnfitrion}</td>
+                      <td style={{ padding: 12 }}>
+                        <div style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={record.motivo}>
+                          {record.motivo}
+                        </div>
+                      </td>
+                      <td style={{ padding: 12 }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button 
+                            title="Ver Detalles" 
+                            onClick={() => handleVerDetalles(record.idMaMe)}
+                            style={{ 
+                              padding: '6px 12px', 
+                              background: '#2368b3', 
+                              color: 'white', 
+                              border: 'none', 
+                              borderRadius: 6, 
+                              cursor: 'pointer', 
+                              fontSize: 14 
+                            }}
+                          >
+                            👁️
+                          </button>
+                          <button 
+                            title="Editar" 
+                            onClick={() => handleEditarMerma(record.idMaMe)}
+                            style={{ 
+                              padding: '6px 12px', 
+                              background: '#38a169', 
+                              color: 'white', 
+                              border: 'none', 
+                              borderRadius: 6, 
+                              cursor: 'pointer', 
+                              fontSize: 14 
+                            }}
+                          >
+                            ✏️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Modal para Nueva Merma - 2 Pasos */}

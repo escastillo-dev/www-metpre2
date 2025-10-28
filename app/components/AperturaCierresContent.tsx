@@ -4,6 +4,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import AperturaCierreModal from './AperturaCierreModal';
 
+// URL de la API - usar variable de entorno o fallback a localhost
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 interface Equipment {
   id: string;
   name: string;
@@ -70,6 +73,14 @@ const equipmentList: Equipment[] = [
 ];
 
 export default function AperturaCierresContent() {
+  // Estado para detectar si es móvil
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [records, setRecords] = useState<OpeningRecord[]>([
     {
       id: 1,
@@ -156,7 +167,7 @@ export default function AperturaCierresContent() {
         detalles: detalles
       };
 
-      const response = await axios.post('http://127.0.0.1:8000/apci', requestData, {
+      const response = await axios.post(`${API_URL}/apci`, requestData, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Basic ${userCredentials}`,
@@ -206,7 +217,7 @@ export default function AperturaCierresContent() {
       // Construir URL con filtro de sucursales
       const sucursalesIds = sucursalesAsignadas.map(s => s.idCentro).join(',');
       
-      const response = await axios.get('http://127.0.0.1:8000/apci/consultar', {
+      const response = await axios.get(`${API_URL}/apci/consultar`, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Basic ${userCredentials}`,
@@ -276,7 +287,7 @@ export default function AperturaCierresContent() {
         return;
       }
 
-      const response = await axios.get<UsuarioResponse>(`http://127.0.0.1:8000/usuarios/${userId}`, {
+      const response = await axios.get<UsuarioResponse>(`${API_URL}/usuarios/${userId}`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -436,7 +447,7 @@ export default function AperturaCierresContent() {
         detalles: detalles
       };
 
-      const response = await axios.post('http://127.0.0.1:8000/apci', apiData, {
+      const response = await axios.post(`${API_URL}/apci`, apiData, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Basic ${userCredentials}`,
@@ -523,14 +534,13 @@ export default function AperturaCierresContent() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
+  <div className="p-5">
       
       {/* Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 24 }}>
+        <div className="stats-grid">
         {loadingRecords ? (
-          // Mostrar skeleton loader mientras cargan los datos
           Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
+            <div key={index} className="stat-card">
               <div style={{ height: 20, background: '#f0f0f0', borderRadius: 4, marginBottom: 12 }}></div>
               <div style={{ height: 32, background: '#f0f0f0', borderRadius: 4, marginBottom: 8 }}></div>
               <div style={{ height: 16, background: '#f0f0f0', borderRadius: 4, width: '60%' }}></div>
@@ -538,15 +548,15 @@ export default function AperturaCierresContent() {
           ))
         ) : (
           stats.map((stat, index) => (
-            <div key={index} style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
+            <div key={index} className="stat-card">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ fontWeight: 600, color: '#2d3748', fontSize: 14 }}>{stat.title}</span>
-                <div style={{ background: stat.bg, color: stat.color, borderRadius: 8, padding: 8, fontSize: 20, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontWeight: 600, color: '#2d3748', fontSize: 18 }}>{stat.title}</span>
+                <div style={{ background: stat.bg, color: stat.color, borderRadius: 8, padding: 12, fontSize: 28, minWidth: 56, minHeight: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   {stat.icon}
                 </div>
               </div>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#23272f', marginBottom: 8 }}>{stat.value}</div>
-              <div style={{ color: stat.positive ? '#38a169' : '#e53e3e', fontWeight: 500, fontSize: 13 }}>{stat.change}</div>
+              <div className="stat-value">{stat.value}</div>
+              <span style={{ color: stat.positive ? '#38a169' : '#e53e3e', fontWeight: 500, fontSize: 15 }}>{stat.change}</span>
             </div>
           ))
         )}
@@ -684,74 +694,124 @@ export default function AperturaCierresContent() {
             <option value="problemas">Con problemas</option>
           </select>
         </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f7fafc' }}>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Sucursal</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Tipo</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Fecha</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Hora Inicio</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Hora Fin</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Anfitrion</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Calificación</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Estado</th>
-                <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loadingRecords ? (
-                <tr>
-                  <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                      Cargando registros...
-                    </div>
-                  </td>
-                </tr>
-              ) : getFilteredRecords().length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>
-                    📋 No hay registros de apertura/cierre para mostrar
-                  </td>
-                </tr>
-              ) : (
-                getFilteredRecords().map(record => (
-                <tr key={record.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: 12 }}>{getBranchName(record.sucursal)}</td>
-                  <td style={{ padding: 12 }}>
-                    <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: record.tipo === 'A' ? 'rgba(56, 161, 105, 0.1)' : 'rgba(245, 148, 43, 0.1)', color: record.tipo === 'A' ? '#38a169' : '#f5942b' }}>
-                      {record.tipo === 'A' ? '🌅 Apertura' : '🌙 Cierre'}
-                    </span>
-                  </td>
-                  <td style={{ padding: 12 }}>{formatDate(record.fecha)}</td>
-                  <td style={{ padding: 12 }}>{record.horaInicio}</td>
-                  <td style={{ padding: 12 }}>{record.horaFin}</td>
-                  <td style={{ padding: 12 }}>{record.anfitrion}</td>
-                  <td style={{ padding: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 600, color: record.calificacion >= 8 ? '#38a169' : record.calificacion >= 6 ? '#f5942b' : '#e53e3e' }}>
-                        {record.calificacion}/10
-                      </span>
-                    </div>
-                  </td>
-                  <td style={{ padding: 12 }}>
-                    <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: record.estado === 'completado' ? 'rgba(56, 161, 105, 0.1)' : 'rgba(229, 62, 62, 0.1)', color: record.estado === 'completado' ? '#38a169' : '#e53e3e' }}>
-                      {record.estado === 'completado' ? 'Completado' : 'Con Problemas'}
-                    </span>
-                  </td>
-                  <td style={{ padding: 12 }}>
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      <button onClick={() => viewDetails(record)} title="Ver Detalles" style={{ padding: '6px 12px', background: '#2368b3', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>
-                        👁️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* Filtro responsive */}
+        <div className={isMobile ? "mb-4" : "mb-4 flex items-center"}>
+          <select
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            className={
+              (isMobile ? "w-full" : "w-auto") +
+              " border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            }
+          >
+            <option value="todos">Todos los registros</option>
+            <option value="apertura">Solo aperturas</option>
+            <option value="cierre">Solo cierres</option>
+            <option value="hoy">Solo hoy</option>
+            <option value="problemas">Con problemas</option>
+          </select>
         </div>
+        {/* Vista responsive: cards en móvil, tabla en desktop */}
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {loadingRecords ? (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: '#4a5568' }}>Cargando registros...</div>
+            ) : getFilteredRecords().length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: '#4a5568' }}>📋 No hay registros de apertura/cierre para mostrar</div>
+            ) : (
+              getFilteredRecords().map(record => (
+                <div
+                  key={record.id}
+                  style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 600, color: '#2d3748', fontSize: 16 }}>{getBranchName(record.sucursal)}</span>
+                    <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 13, fontWeight: 600, background: record.tipo === 'A' ? 'rgba(56, 161, 105, 0.1)' : 'rgba(245, 148, 43, 0.1)', color: record.tipo === 'A' ? '#38a169' : '#f5942b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      {record.tipo === 'A' ? '📦 Apertura' : '🔒 Cierre'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 14, color: '#4a5568', marginBottom: 2 }}>
+                    <span>Fecha: {formatDate(record.fecha)}</span> <span style={{ marginLeft: 12 }}>Hora Inicio: {record.horaInicio || '--:--:--'}</span>
+                  </div>
+                  <div style={{ fontSize: 14, color: '#4a5568', marginBottom: 2 }}>
+                    <span>Hora Fin: {record.horaFin || '--:--:--'}</span> <span style={{ marginLeft: 12 }}>Anfitrión: {record.anfitrion}</span>
+                  </div>
+                  <div style={{ fontSize: 14, color: '#4a5568', marginBottom: 2 }}>
+                    <span>Calificación: <span style={{ fontWeight: 600, color: record.calificacion >= 8 ? '#38a169' : record.calificacion >= 6 ? '#f5942b' : '#e53e3e' }}>{record.calificacion}/10</span></span> <span style={{ marginLeft: 12 }}>Estado: <span style={{ fontWeight: 600, color: record.estado === 'completado' ? '#38a169' : '#e53e3e' }}>{record.estado === 'completado' ? 'Completado' : 'Con Problemas'}</span></span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <button
+                      onClick={() => viewDetails(record)}
+                      title="Ver Detalles"
+                      style={{ padding: '8px 16px', background: '#2368b3', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 15, fontWeight: 500, boxShadow: '0 2px 8px rgba(35,104,179,0.12)' }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>👁️ Ver Detalles</span>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
+              <thead>
+                <tr style={{ background: '#f7fafc' }}>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Sucursal</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Tipo</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Fecha</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Hora Inicio</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Hora Fin</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Anfitrión</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Calificación</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Estado</th>
+                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: '#4a5568' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingRecords ? (
+                  <tr>
+                    <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>Cargando registros...</td>
+                  </tr>
+                ) : getFilteredRecords().length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>📋 No hay registros de apertura/cierre para mostrar</td>
+                  </tr>
+                ) : (
+                  getFilteredRecords().map(record => (
+                    <tr key={record.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: 12 }}>{getBranchName(record.sucursal)}</td>
+                      <td style={{ padding: 12 }}>
+                        <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 13, fontWeight: 600, background: record.tipo === 'A' ? 'rgba(56, 161, 105, 0.1)' : 'rgba(245, 148, 43, 0.1)', color: record.tipo === 'A' ? '#38a169' : '#f5942b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {record.tipo === 'A' ? '📦 Apertura' : '🔒 Cierre'}
+                        </span>
+                      </td>
+                      <td style={{ padding: 12 }}>{formatDate(record.fecha)}</td>
+                      <td style={{ padding: 12 }}>{record.horaInicio}</td>
+                      <td style={{ padding: 12 }}>{record.horaFin}</td>
+                      <td style={{ padding: 12 }}>{record.anfitrion}</td>
+                      <td style={{ padding: 12 }}>
+                        <span style={{ fontWeight: 600, color: record.calificacion >= 8 ? '#38a169' : record.calificacion >= 6 ? '#f5942b' : '#e53e3e' }}>{record.calificacion}/10</span>
+                      </td>
+                      <td style={{ padding: 12 }}>
+                        <span style={{ fontWeight: 600, color: record.estado === 'completado' ? '#38a169' : '#e53e3e' }}>{record.estado === 'completado' ? 'Completado' : 'Con Problemas'}</span>
+                      </td>
+                      <td style={{ padding: 12 }}>
+                        <button
+                          onClick={() => viewDetails(record)}
+                          title="Ver Detalles"
+                          style={{ padding: '8px 16px', background: '#2368b3', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 15, fontWeight: 500, boxShadow: '0 2px 8px rgba(35,104,179,0.12)' }}
+                        >
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>👁️ Ver Detalles</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Modal de Vista Previa */}
