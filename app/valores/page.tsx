@@ -326,128 +326,56 @@ export default function ValoresPage() {
   if (error) return <div>Error: {error}</div>;
 
   return (
-    <div style={{
-      width: "100%",
-      height: "100vh",
-      padding: "2rem",
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-      overflowY: "auto"
-    }}>
+    <div className="min-h-screen p-4 md:p-6 lg:p-8 bg-gradient-to-br from-purple-600 to-purple-800 overflow-y-auto">
       
-      <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "2rem",
-          background: "white",
-          padding: "1.5rem",
-          borderRadius: "12px",
-          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)"
-        }}>
-          <h1 style={{ 
-            color: "#2d3748", 
-            fontSize: "1.875rem", 
-            fontWeight: "700",
-            margin: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: "0.75rem"
-          }}>
-            <span style={{ fontSize: "2rem" }}>💰</span>
-            Manejo de Valores
-          </h1>
-          <button
-            style={{
-              padding: "0.875rem 1.75rem",
-              backgroundColor: "#38a169",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              fontSize: "1rem",
-              fontWeight: "600",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
-              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-              transition: "all 0.2s ease"
-            }}
-            onClick={() => setShowModal(true)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#2f855a";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#38a169";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            <span style={{ fontSize: "1.25rem" }}>➕</span>
-            Registrar Movimiento
-          </button>
-        </div>
+      {/* Header responsive */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white p-4 md:p-6 rounded-xl shadow-md">
+        <h1 className="text-xl md:text-3xl font-bold text-gray-800 flex items-center gap-3">
+          <span className="text-3xl md:text-4xl">💰</span>
+          <span>Manejo de Valores</span>
+        </h1>
+        <button
+          className="w-full md:w-auto px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg transition-all duration-200 hover:-translate-y-0.5"
+          onClick={() => setShowModal(true)}
+        >
+          <span className="text-xl">➕</span>
+          <span className="md:hidden">Nuevo</span>
+          <span className="hidden md:inline">Registrar Movimiento</span>
+        </button>
+      </div>
       
-        {/* Filtros */}
-        <div className="search-section" style={{
-          background: "white",
-          padding: "1.5rem",
-          borderRadius: "12px",
-          marginBottom: "1.5rem",
-          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)"
-        }}>
-        <h4 style={{ marginBottom: "1rem" }}>Filtros de Búsqueda</h4>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: "1rem",
-          alignItems: "end"
-        }}>
-          <div>
-            <label className="form-label">Fecha</label>
+      {/* Filtros responsive */}
+      <div className="bg-white p-4 md:p-6 rounded-xl mb-6 shadow-md">
+        <h4 className="text-lg font-semibold mb-4 text-gray-700">Filtros de Búsqueda</h4>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
             <input
               type="date"
               value={fechaFiltro}
               onChange={(e) => setFechaFiltro(e.target.value)}
-              className="form-input"
-              style={{
-                width: "100%",
-                padding: "0.5rem",
-                border: "1px solid #e2e8f0",
-                borderRadius: "0.375rem"
-              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>
           <div>
-            <label className="form-label">Folio</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Folio</label>
             <input
               type="number"
               value={folioFiltro}
               onChange={(e) => setFolioFiltro(e.target.value)}
-              className="form-input"
-              style={{
-                width: "100%",
-                padding: "0.5rem",
-                border: "1px solid #e2e8f0",
-                borderRadius: "0.375rem"
-              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               min="1"
+              placeholder="#"
             />
           </div>
-          <div>
-            <label className="form-label">Sucursal</label>
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal</label>
             <select
               value={sucursalFiltro}
               onChange={(e) => setSucursalFiltro(e.target.value)}
-              className="form-input"
-              style={{
-                width: "100%",
-                padding: "0.5rem",
-                border: "1px solid #e2e8f0",
-                borderRadius: "0.375rem",
-                backgroundColor: "white"
-              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
             >
-              <option value="">Todas las sucursales asignadas</option>
+              <option value="">Todas las sucursales</option>
               {sucursalesAsignadas
                 .sort((a, b) => a.Sucursal.localeCompare(b.Sucursal))
                 .map((sucursal) => (
@@ -457,36 +385,35 @@ export default function ValoresPage() {
                 ))}
             </select>
           </div>
+          <div className="col-span-2 lg:col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Registros</label>
+            <select
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setOffset(0);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
         </div>
-        <div style={{ marginTop: "1rem" }}>
+        <div className="flex flex-col sm:flex-row gap-2 mt-4">
           <button
-            style={{
-              padding: "0.5rem 1rem",
-              backgroundColor: "#667eea",
-              color: "white",
-              border: "none",
-              borderRadius: "0.375rem",
-              cursor: "pointer",
-              fontWeight: "500",
-              marginRight: "0.5rem"
-            }}
+            className="flex-1 sm:flex-none px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
             onClick={() => {
-              setOffset(0); // Resetear la paginación
+              setOffset(0);
               fetchMovimientos();
             }}
           >
-            Buscar
+            🔍 Buscar
           </button>
           <button
-            style={{
-              padding: "0.5rem 1rem",
-              backgroundColor: "#718096",
-              color: "white",
-              border: "none",
-              borderRadius: "0.375rem",
-              cursor: "pointer",
-              fontWeight: "500"
-            }}
+            className="flex-1 sm:flex-none px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
             onClick={() => {
               setFechaFiltro('');
               setFolioFiltro('');
@@ -495,130 +422,178 @@ export default function ValoresPage() {
               fetchMovimientos();
             }}
           >
-            Limpiar Filtros
+            🗑️ Limpiar
           </button>
         </div>
       </div>
 
-        {/* Lista de movimientos */}
-        <div style={{
-          background: "white",
-          borderRadius: "12px",
-          overflow: "hidden",
-          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-          width: "100%"
-        }}>
-        <div style={{ 
-          padding: "1rem", 
-          borderBottom: "1px solid #e2e8f0",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center"
-        }}>
-          <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>Total de registros: {total}</h3>
+      {/* Lista de movimientos - Responsive */}
+      <div className="bg-white rounded-xl overflow-hidden shadow-md">
+        <div className="px-4 md:px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <h3 className="text-base md:text-lg font-semibold text-gray-800">
+            <span className="md:hidden">Total: {total}</span>
+            <span className="hidden md:inline">Total: {total} registros</span>
+          </h3>
         </div>
-        <div style={{ overflowX: "auto", width: "100%" }}>
-          <table style={{
-            width: "100%",
-            borderCollapse: "collapse"
-          }}>
-            <thead>
+
+        {/* MÓVIL: Cards verticales - Solo visible en móvil */}
+        <div className="block md:hidden p-4 space-y-3">
+          {movimientos.map((movimiento) => (
+            <div
+              key={`mobile-${movimiento.folio}`}
+              className="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+            >
+              {/* Header del card */}
+              <div className="flex justify-between items-start mb-3 pb-3 border-b border-gray-200">
+                <div>
+                  <div className="text-sm font-semibold text-purple-600">
+                    Folio #{movimiento.folio}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {movimiento.sucursal}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-green-600">
+                    {movimiento.movimiento === 'R' ? '💰' : movimiento.movimiento === 'D' ? '🏦' : '📊'} {movimiento.movimiento}
+                  </div>
+                  <div className="text-sm font-semibold text-gray-800">
+                    {movimiento.importe ? `$${movimiento.importe.toFixed(2)}` : 'N/A'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Detalles */}
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">📅</span>
+                  <span className="text-gray-700">
+                    {movimiento.fecha ? movimiento.fecha.slice(0, 10).split('-').reverse().join('/') : 'N/A'}
+                  </span>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-500">🕐</span>
+                  <span className="text-gray-700">{movimiento.hora || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">📝</span>
+                  <span className="text-gray-700">{movimiento.incidencia || 'Sin incidencia'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500">💵</span>
+                  <span className="text-gray-700">Tipo: <strong>{movimiento.tipoSF || '-'}</strong></span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* TABLET: Tabla simplificada - Visible en tablet */}
+        <div className="hidden md:block lg:hidden overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Folio</th>
-                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Sucursal</th>
-                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Fecha</th>
-                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Hora</th>
-                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Movimiento</th>
-                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568" }}>Incidencia</th>
-                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Tipo SF</th>
-                <th style={{ padding: "1rem", textAlign: "left", background: "#f7fafc", fontWeight: 600, color: "#4a5568", whiteSpace: "nowrap" }}>Importe</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Folio</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Sucursal</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Fecha</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Mov.</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Importe</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {movimientos.map((movimiento) => (
-                <tr key={movimiento.folio} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.folio}</td>
-                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.sucursal}</td>
-                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>
-                    {movimiento.fecha
-                    ? movimiento.fecha.slice(0, 10).split('-').reverse().join('/')
-                    : 'N/A'}
-                  </td>
-                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.hora || 'N/A'}</td>
-                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.movimiento || 'N/A'}</td>
-                  <td style={{ padding: "1rem" }}>{movimiento.incidencia || 'Sin incidencia'}</td>
-                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>{movimiento.tipoSF || 'N/A'}</td>
-                  <td style={{ padding: "1rem", whiteSpace: "nowrap" }}>
-                    {movimiento.importe ? `$${movimiento.importe.toFixed(2)}` : 'N/A'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                <tr key={`tablet-${movimiento.folio}`} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-sm font-medium text-purple-600">#{movimiento.folio}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{movimiento.sucursal}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                      {movimiento.fecha ? movimiento.fecha.slice(0, 10).split('-').reverse().join('/') : 'N/A'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                        {movimiento.movimiento === 'R' ? '💰' : movimiento.movimiento === 'D' ? '🏦' : '📊'}
+                        {movimiento.movimiento}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-800">
+                      {movimiento.importe ? `$${movimiento.importe.toFixed(2)}` : 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
         </div>
-        {/* Paginación */}
-        <div className="pagination-container" style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '1rem',
-          backgroundColor: 'white',
-          borderTop: '1px solid #e2e8f0'
-        }}>
-          <div className="pagination-info" style={{ color: '#4a5568' }}>
-            Mostrando {offset + 1} - {Math.min(offset + limit, total)} de {total} movimientos
+
+        {/* DESKTOP: Tabla completa - Visible en desktop */}
+        <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Folio</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Sucursal</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Fecha</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Hora</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Movimiento</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Incidencia</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tipo SF</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Importe</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {movimientos.map((movimiento) => (
+                  <tr key={movimiento.folio} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-sm font-medium text-purple-600 whitespace-nowrap">#{movimiento.folio}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{movimiento.sucursal}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                      {movimiento.fecha ? movimiento.fecha.slice(0, 10).split('-').reverse().join('/') : 'N/A'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">{movimiento.hora || 'N/A'}</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                        {movimiento.movimiento === 'R' ? '💰' : movimiento.movimiento === 'D' ? '🏦' : '📊'}
+                        {movimiento.movimiento}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{movimiento.incidencia || 'Sin incidencia'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap font-medium">{movimiento.tipoSF || '-'}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-800 whitespace-nowrap">
+                      {movimiento.importe ? `$${movimiento.importe.toFixed(2)}` : 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+        </div>
+
+        {/* Paginación responsive */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 px-4 md:px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="text-sm text-gray-600 order-2 md:order-1">
+            <span className="md:hidden">{offset + 1}-{Math.min(offset + limit, total)} de {total}</span>
+            <span className="hidden md:inline">Mostrando {offset + 1} - {Math.min(offset + limit, total)} de {total} movimientos</span>
           </div>
-          <div className="pagination-controls" style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="flex gap-2 order-1 md:order-2">
             <button
               onClick={() => setOffset(Math.max(0, offset - limit))}
               disabled={offset === 0}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #e2e8f0',
-                borderRadius: '0.375rem',
-                backgroundColor: offset === 0 ? '#f7fafc' : 'white',
-                color: offset === 0 ? '#a0aec0' : '#2368b3',
-                cursor: offset === 0 ? 'not-allowed' : 'pointer',
-              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                offset === 0
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}
             >
-              Anterior
+              <span className="md:hidden">←</span>
+              <span className="hidden md:inline">← Anterior</span>
             </button>
             <button
               onClick={() => setOffset(offset + limit)}
               disabled={offset + limit >= total}
-              style={{
-                padding: '0.5rem 1rem',
-                border: '1px solid #e2e8f0',
-                borderRadius: '0.375rem',
-                backgroundColor: offset + limit >= total ? '#f7fafc' : 'white',
-                color: offset + limit >= total ? '#a0aec0' : '#2368b3',
-                cursor: offset + limit >= total ? 'not-allowed' : 'pointer',
-              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                offset + limit >= total
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}
             >
-              Siguiente
+              <span className="md:hidden">→</span>
+              <span className="hidden md:inline">Siguiente →</span>
             </button>
-          </div>
-          <div className="pagination-size" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label htmlFor="limit" style={{ color: '#4a5568' }}>Mostrar:</label>
-            <select
-              id="limit"
-              value={limit}
-              onChange={(e) => {
-                setLimit(Number(e.target.value));
-                setOffset(0); // Resetear a la primera página cuando se cambia el límite
-              }}
-              style={{
-                padding: '0.5rem',
-                border: '1px solid #e2e8f0',
-                borderRadius: '0.375rem',
-                backgroundColor: 'white',
-              }}
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
           </div>
         </div>
       </div>

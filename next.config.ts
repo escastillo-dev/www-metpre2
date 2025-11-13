@@ -25,6 +25,10 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Configurar variables de entorno para el cliente
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  },
 };
 
 export default withPWA(nextConfig);

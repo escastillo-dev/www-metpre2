@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [error, setError] = useState(""); // Mensaje de error
 
   // URL de la API - usar variable de entorno o fallback a localhost
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +28,9 @@ export default function LoginPage() {
 
     try {
       // Enviar solicitud a la API
+      console.log("🚀 Enviando solicitud de login a:", `${API_URL}/usuarios/autenticar`);
+      console.log("📦 Datos enviados:", { idUsuarios: parseInt(nomina), pwd: "***" });
+      
       const response = await axios.post(
         `${API_URL}/usuarios/autenticar`,
         {
@@ -41,7 +44,7 @@ export default function LoginPage() {
         }
       );
 
-      console.log("Respuesta de la API:", response.data);
+      console.log("✅ Respuesta de la API:", response.data);
 
       if (response.data.estatus === 1) {
         try {
@@ -93,7 +96,29 @@ export default function LoginPage() {
     } catch (err: any) {
       console.error("Error en el login:", err);
       console.log("Detalles del error:", err.response?.data || err.message || err);
-      setError("Ocurrió un error de red. Inténtalo de nuevo.");
+      
+      // Manejo específico de errores
+      if (err.response) {
+        // El servidor respondió con un código de error
+        const status = err.response.status;
+        const data = err.response.data;
+        
+        if (status === 401 || status === 403) {
+          setError(data?.mensaje || "Credenciales incorrectas. Verifica tu nómina y contraseña.");
+        } else if (status === 404) {
+          setError("Servicio no encontrado. Contacta al administrador.");
+        } else if (status >= 500) {
+          setError("Error del servidor. Intenta de nuevo en unos momentos.");
+        } else {
+          setError(data?.mensaje || `Error del servidor (${status}). Intenta de nuevo.`);
+        }
+      } else if (err.request) {
+        // La petición se hizo pero no hubo respuesta
+        setError("No se pudo conectar con el servidor. Verifica tu conexión a internet.");
+      } else {
+        // Algo pasó al configurar la petición
+        setError("Error inesperado. Intenta de nuevo.");
+      }
     }
   };
 
