@@ -2,7 +2,7 @@
 import axios, { AxiosResponse, AxiosError } from 'axios';
 
 // Configuración base de la API
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net';
+const API_BASE_URL = 'https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net';
 
 // Interfaces compartidas
 export interface ApiResponse<T = any> {

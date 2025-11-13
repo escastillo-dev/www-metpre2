@@ -6,7 +6,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearSca
 import { Pie, Bar } from 'react-chartjs-2';
 
 // URL de la API - usar variable de entorno o fallback a localhost
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const API_URL = "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
 
 ChartJS.register(
   ArcElement,

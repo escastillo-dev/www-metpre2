@@ -8,8 +8,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState(""); // Contraseña
   const [error, setError] = useState(""); // Mensaje de error
 
-  // URL de la API - usar variable de entorno o fallback a localhost
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
+  // URL de la API - HARDCODEADA para evitar problemas de variables de entorno
+  const API_URL = "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
+
+  // DEBUG: Imprimir la URL que se está usando siempre
+  console.log("🔍 DEBUG - API_URL final:", API_URL);
+  console.log("🔍 DEBUG - process.env.NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
+  console.log("🔍 DEBUG - Variable de entorno disponible:", !!process.env.NEXT_PUBLIC_API_URL);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,47 +32,57 @@ export default function LoginPage() {
     }
 
     try {
-      // Enviar solicitud a la API
-      console.log("🚀 Enviando solicitud de login a:", `${API_URL}/usuarios/autenticar`);
+      // Usar fetch en lugar de axios para evitar configuraciones globales
+      const fullUrl = `${API_URL}/usuarios/autenticar`;
+      console.log("🚀 URL COMPLETA que se va a usar:", fullUrl);
       console.log("📦 Datos enviados:", { idUsuarios: parseInt(nomina), pwd: "***" });
       
-      const response = await axios.post(
-        `${API_URL}/usuarios/autenticar`,
-        {
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           idUsuarios: parseInt(nomina),
           pwd: password,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+        })
+      });
 
-      console.log("✅ Respuesta de la API:", response.data);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      if (response.data.estatus === 1) {
+      const responseData = await response.json();
+      console.log("✅ Respuesta de la API:", responseData);
+
+      if (responseData.estatus === 1) {
         try {
           // Crear credenciales en formato Base64 para autenticación básica
           const credentials = btoa(`${nomina}:${password}`);
           console.log('Credenciales generadas');
           
-          const userName = response.data.usuario.nombre;
-          const idNivelUsuario = response.data.usuario.idNivelUsuario;
-          const token = response.data.token;
+          const userName = responseData.usuario.nombre;
+          const idNivelUsuario = responseData.usuario.idNivelUsuario;
+          const token = responseData.token;
           
           // Obtener el nombre del nivel desde la API de niveles
-          const nivelResponse = await axios.get(`${API_URL}/niveles-usuario`, {
+          const nivelResponse = await fetch(`${API_URL}/niveles-usuario`, {
+            method: 'GET',
             headers: {
               'Authorization': `Basic ${credentials}`,
               'Content-Type': 'application/json'
             }
           });
           
-          console.log('Respuesta de niveles:', nivelResponse.data);
+          if (!nivelResponse.ok) {
+            throw new Error(`HTTP error! status: ${nivelResponse.status}`);
+          }
+          
+          const nivelData = await nivelResponse.json();
+          console.log('Respuesta de niveles:', nivelData);
           
           // Encontrar el nivel correspondiente al idNivelUsuario
-          const nivelInfo = nivelResponse.data.niveles.find(
+          const nivelInfo = nivelData.niveles.find(
             (nivel: { idNivelUsuario: number, NivelUsuario: string }) => 
             nivel.idNivelUsuario === idNivelUsuario
           );
@@ -91,7 +106,7 @@ export default function LoginPage() {
           setError("Error al obtener el nivel del usuario. Por favor, intente de nuevo.");
         }
       } else {
-        setError(response.data.mensaje || "Credenciales incorrectas. Inténtalo de nuevo.");
+        setError(responseData.mensaje || "Credenciales incorrectas. Inténtalo de nuevo.");
       }
     } catch (err: any) {
       console.error("Error en el login:", err);
