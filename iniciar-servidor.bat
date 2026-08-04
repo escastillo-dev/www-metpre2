@@ -14,6 +14,16 @@ echo ========================================
 echo.
 
 cd /d "%~dp0"
+
+echo Compilando la version mas reciente...
+call npm run build
+if errorlevel 1 (
+  echo.
+  echo [ERROR] No fue posible compilar la aplicacion.
+  pause
+  exit /b 1
+)
+
 start "Next.js PWA" cmd /k "npm run start"
 
 echo.
