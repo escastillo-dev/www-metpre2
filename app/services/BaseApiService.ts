@@ -1,8 +1,8 @@
 // Service Layer - Centralización de llamadas API
 import axios, { AxiosResponse, AxiosError } from 'axios';
 
-// Configuración base de la API
-const API_BASE_URL = 'https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net';
+// Configuración base de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 // Interfaces compartidas
 export interface ApiResponse<T = any> {

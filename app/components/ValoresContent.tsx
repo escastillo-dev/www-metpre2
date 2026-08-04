@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context';
 import ValoresTable from './ValoresTable';
 import ValoresModal from './ValoresModal';
 import '../styles/forms.css';
 import '../dashboard/dashboard.css';
 
-// URL de la API - usar variable de entorno o fallback a localhost
-const API_URL = "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
+// URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 interface MovimientoAPI {
   Folio: number;
@@ -43,21 +44,6 @@ interface Sucursal {
   Sucursal: string;
 }
 
-interface Usuario {
-  idUsuarios: number;
-  NombreUsuario: string;
-  idNivelUsuario: number;
-  estatus: number;
-  FechaAlta?: string;
-}
-
-interface UsuarioResponse {
-  estatus: number;
-  mensaje: string;
-  usuario: Usuario;
-  sucursales?: Sucursal[];
-}
-
 interface MovimientoFormData {
   idCentro: string;
   movimiento: string;
@@ -75,8 +61,11 @@ interface MovimientoFormData {
 }
 
 export default function ValoresContent() {
+  const { state: authState } = useAuth();
+  const guardandoMovimientoRef = useRef(false);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingMovimientos, setLoadingMovimientos] = useState(false);
+  const [guardandoMovimiento, setGuardandoMovimiento] = useState(false);
   const [error, setError] = useState('');
   const [total, setTotal] = useState(0);
   const [sucursalesAsignadas, setSucursalesAsignadas] = useState<Sucursal[]>([]);
@@ -114,6 +103,8 @@ export default function ValoresContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (guardandoMovimientoRef.current) return;
+
     const userCredentials = localStorage.getItem('userCredentials');
     const userId = localStorage.getItem('userId');
     
@@ -122,30 +113,73 @@ export default function ValoresContent() {
       return;
     }
 
+    guardandoMovimientoRef.current = true;
+    setGuardandoMovimiento(true);
+
     try {
       // La hora ya viene en formato HH:MM, solo agregamos segundos
       let hora = formData.hora;
       if (hora && hora.length === 5) {
         hora = hora + ':00';
       }
-      const response = await axios.post(
-        `${API_URL}/mmv/movimientos`,
-        {
-          ...formData,
-          idUsuarios: parseInt(userId),
-          hora: hora,
-          caja: formData.caja ? Number(formData.caja) : 0,
-          cajero: formData.cajero ? Number(formData.cajero) : 0,
-          anfitrion: formData.anfitrion ? Number(formData.anfitrion) : 0,
-          sfMonto: formData.sfMonto ? Number(formData.sfMonto) : 0
-        },
-        {
-          headers: {
-            'Authorization': `Basic ${userCredentials}`,
-            'Content-Type': 'application/json'
-          }
+
+      const headers = {
+        'Authorization': `Basic ${userCredentials}`,
+        'Content-Type': 'application/json'
+      };
+      const movimientoData = {
+        ...formData,
+        idUsuarios: Number(userId),
+        idIncidencia: Number(formData.idIncidencia),
+        hora,
+        caja: formData.caja ? Number(formData.caja) : 0,
+        cajero: formData.cajero ? Number(formData.cajero) : 0,
+        anfitrion: formData.anfitrion ? Number(formData.anfitrion) : 0,
+        sfMonto: formData.sfMonto ? Number(formData.sfMonto) : 0
+      };
+
+      const registrarMovimiento = () =>
+        axios.post(`${API_URL}/mmv/movimientos`, movimientoData, { headers });
+
+      let response;
+      try {
+        response = await registrarMovimiento();
+      } catch (movimientoError: unknown) {
+        const movimientoRespuesta = axios.isAxiosError(movimientoError)
+          ? movimientoError.response
+          : undefined;
+        const datosError = movimientoRespuesta?.data as
+          | { mensaje?: unknown; detail?: unknown }
+          | undefined;
+        const mensaje = String(datosError?.mensaje || datosError?.detail || '').toLowerCase();
+        const faltaFolio =
+          movimientoRespuesta?.status === 400 &&
+          mensaje.includes('no hay folio abierto');
+
+        if (!faltaFolio) throw movimientoError;
+
+        const folioResponse = await axios.post(
+          `${API_URL}/mmv/folios`,
+          {
+            idCentro: movimientoData.idCentro,
+            hora: movimientoData.hora,
+            anfitrion: movimientoData.anfitrion,
+            idUsuarios: movimientoData.idUsuarios,
+            idIncidencia: movimientoData.idIncidencia,
+            caja: movimientoData.caja,
+            cajero: movimientoData.cajero,
+            comentario: movimientoData.comentario
+          },
+          { headers }
+        );
+
+        if (folioResponse.data?.estatus !== 1) {
+          throw new Error(folioResponse.data?.mensaje || 'No fue posible abrir el folio');
         }
-      );
+
+        // Reintentar una sola vez después de abrir el folio.
+        response = await registrarMovimiento();
+      }
 
       if (response.data.estatus === 1) {
         alert(response.data.mensaje);
@@ -170,18 +204,14 @@ export default function ValoresContent() {
       } else {
         alert(response.data.mensaje || 'Error desconocido al registrar el movimiento');
       }
-    } catch (error: any) {
-      let mensaje = 'Error al registrar el movimiento';
-      if (error.response?.data?.detail) {
-        if (typeof error.response.data.detail === 'string') {
-          mensaje = error.response.data.detail;
-        } else if (typeof error.response.data.detail === 'object') {
-          mensaje = JSON.stringify(error.response.data.detail);
-        }
-      } else if (error.message) {
-        mensaje = error.message;
-      }
-      alert(mensaje);
+    } catch (error: unknown) {
+      const data = axios.isAxiosError(error) ? error.response?.data : undefined;
+      const mensaje = data?.mensaje || data?.detail ||
+        (error instanceof Error ? error.message : 'Error al registrar el movimiento');
+      alert(typeof mensaje === 'string' ? mensaje : JSON.stringify(mensaje));
+    } finally {
+      guardandoMovimientoRef.current = false;
+      setGuardandoMovimiento(false);
     }
   };
   
@@ -190,42 +220,6 @@ export default function ValoresContent() {
   const [fechaFiltro, setFechaFiltro] = useState('');
   const [folioFiltro, setFolioFiltro] = useState('');
   const [sucursalFiltro, setSucursalFiltro] = useState('');
-
-  const fetchSucursalesAsignadas = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const userCredentials = localStorage.getItem('userCredentials');
-      const userId = localStorage.getItem('userId');
-      
-      if (!userCredentials || !userId) {
-        setError('No se encontraron las credenciales del usuario');
-        setLoading(false);
-        return;
-      }
-
-      const response = await axios.get<UsuarioResponse>(`${API_URL}/usuarios/${userId}`, {
-        headers: {
-          'Authorization': `Basic ${userCredentials}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.data.estatus === 1) {
-        if (response.data.sucursales && Array.isArray(response.data.sucursales)) {
-          setSucursalesAsignadas(response.data.sucursales);
-        } else {
-          setError('No hay sucursales asignadas para este usuario');
-        }
-      } else {
-        setError(response.data.mensaje || 'Error al obtener la información de las sucursales');
-      }
-    } catch (error) {
-      setError('Error al obtener las sucursales asignadas');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchIncidencias = async () => {
     try {
@@ -252,9 +246,18 @@ export default function ValoresContent() {
   };
 
   useEffect(() => {
-    fetchSucursalesAsignadas();
     fetchIncidencias();
   }, []);
+
+  useEffect(() => {
+    if (authState.sucursales.length > 0) {
+      setSucursalesAsignadas(authState.sucursales);
+      setError('');
+    } else if (!authState.loading && authState.isAuthenticated) {
+      setSucursalesAsignadas([]);
+      setError('No hay sucursales asignadas para este usuario');
+    }
+  }, [authState.sucursales, authState.loading, authState.isAuthenticated]);
 
   useEffect(() => {
     if (sucursalesAsignadas.length > 0) {
@@ -263,47 +266,51 @@ export default function ValoresContent() {
   }, [sucursalesAsignadas, offset, limit, fechaFiltro, folioFiltro, sucursalFiltro]);
 
   const fetchMovimientos = async () => {
-    setLoading(true);
+    setLoadingMovimientos(true);
     setError('');
     try {
       const userCredentials = localStorage.getItem('userCredentials');
       if (!userCredentials) {
         setError('No se encontraron las credenciales');
-        setLoading(false);
         return;
       }
 
       if (sucursalesAsignadas.length === 0) {
         setMovimientos([]);
         setTotal(0);
-        setLoading(false);
         return;
       }
 
-      let url = `${API_URL}/mmv/movimientos?limit=${limit}&offset=${offset}`;
-      
-      const sucursalesIds = sucursalesAsignadas.map(s => s.idCentro).join(',');
-      url += `&sucursales=${sucursalesIds}`;
+      const centros = sucursalFiltro
+        ? [sucursalFiltro]
+        : sucursalesAsignadas.map(sucursal => sucursal.idCentro);
 
-      if (fechaFiltro) {
-        url += `&fecha=${fechaFiltro}`;
-      }
-      if (folioFiltro) {
-        url += `&folio=${folioFiltro}`;
-      }
-      if (sucursalFiltro && sucursalesAsignadas.some(s => s.idCentro === sucursalFiltro)) {
-        url += `&idCentro=${sucursalFiltro}`;
-      }
+      // La API solo admite un idCentro por solicitud. Consultar cada sucursal
+      // asignada evita la búsqueda global que provocaba esperas prolongadas.
+      const responses = await Promise.all(
+        centros.map(idCentro => axios.get<MovimientosResponse>(`${API_URL}/mmv/movimientos`, {
+          params: {
+            idCentro,
+            limit,
+            offset,
+            ...(fechaFiltro ? { fecha: fechaFiltro } : {}),
+            ...(folioFiltro ? { folio: folioFiltro } : {})
+          },
+          headers: {
+            'Authorization': `Basic ${userCredentials}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 60000
+        }))
+      );
 
-      const response = await axios.get<MovimientosResponse>(url, {
-        headers: {
-          'Authorization': `Basic ${userCredentials}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const respuestasValidas = responses.filter(response =>
+        response.data.estatus === 1 && Array.isArray(response.data.items)
+      );
+      const items = respuestasValidas.flatMap(response => response.data.items);
 
-      if (response.data.estatus === 1 && Array.isArray(response.data.items)) {
-        const movimientosProcesados = response.data.items
+      if (respuestasValidas.length === responses.length) {
+        const movimientosProcesados = items
           .map(movimiento => ({
             folio: movimiento.Folio,
             sucursal: movimiento.Sucursales,
@@ -330,31 +337,28 @@ export default function ValoresContent() {
         });
         
         setMovimientos(movimientosFiltrados);
-        setTotal(movimientosFiltrados.length); // Usar el total filtrado en lugar del total del servidor
+        setTotal(respuestasValidas.reduce((totalActual, response) => totalActual + response.data.total, 0));
       } else {
         setError('Error al obtener los movimientos: formato de datos inválido');
       }
-    } catch (error) {
-      setError('Error al cargar los movimientos');
+    } catch (error: unknown) {
+      const detalle = axios.isAxiosError(error)
+        ? error.response?.data?.mensaje || error.message
+        : error instanceof Error ? error.message : 'Error desconocido';
+      setError(`Error al cargar los movimientos: ${detalle}`);
     } finally {
-      setLoading(false);
+      setLoadingMovimientos(false);
     }
   };
 
-  if (loading) return <div>Cargando...</div>;
-  if (error) return <div>Error: {error}</div>;
-
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ 
-        marginBottom: '20px', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center' 
-      }}>
-        <h1>Manejo de Valores</h1>
+    <div style={{ padding: '20px' }} className="px-3 py-4 sm:px-5 sm:py-5">
+      {error && <div style={{ marginBottom: 12, color: '#c53030' }}>Error: {error}</div>}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3" style={{ marginBottom: '20px' }}>
+        <h1 className="text-xl sm:text-2xl" style={{ margin: 0 }}>Manejo de Valores</h1>
         <button 
           onClick={() => setShowModal(true)}
+          className="w-full sm:w-auto"
           style={{
             backgroundColor: '#007bff',
             color: 'white',
@@ -457,25 +461,24 @@ export default function ValoresContent() {
         </div>
       </div>
 
-      {/* Tabla de movimientos */}
-      <div style={{ overflowX: 'auto' }}>
-        <ValoresTable movimientos={movimientos} />
-      </div>
+      {/* Tabla de movimientos (responsive: tabla en escritorio, tarjetas en móvil) */}
+      {loadingMovimientos
+        ? <div>Cargando movimientos...</div>
+        : <ValoresTable movimientos={movimientos} />
+      }
 
       {/* Paginación */}
-      <div style={{ 
-        marginTop: '20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3" style={{ 
+        marginTop: '20px'
       }}>
-        <div>
+        <div className="text-sm text-center sm:text-left">
           Mostrando {movimientos.length} de {total} registros
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="flex gap-2 justify-center sm:justify-start">
           <button
             onClick={() => setOffset(Math.max(0, offset - limit))}
             disabled={offset === 0}
+            className="flex-1 sm:flex-none"
             style={{
               padding: '8px 16px',
               backgroundColor: offset === 0 ? '#6c757d' : '#007bff',
@@ -490,6 +493,7 @@ export default function ValoresContent() {
           <button
             onClick={() => setOffset(offset + limit)}
             disabled={movimientos.length < limit}
+            className="flex-1 sm:flex-none"
             style={{
               padding: '8px 16px',
               backgroundColor: movimientos.length < limit ? '#6c757d' : '#007bff',
@@ -513,6 +517,7 @@ export default function ValoresContent() {
         setFormData={setFormData}
         incidencias={incidencias}
         sucursalesAsignadas={sucursalesAsignadas}
+        guardando={guardandoMovimiento}
       />
     </div>
   );

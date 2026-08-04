@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-// URL de la API - usar variable de entorno o fallback a localhost
-const API_URL = "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
+// URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 interface Usuario {
   idUsuarios: number;

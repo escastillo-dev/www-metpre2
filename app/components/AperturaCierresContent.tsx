@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import AperturaCierreModal from './AperturaCierreModal';
+import { getConReintentos } from '../services/httpRetry';
 
-// URL de la API - usar variable de entorno o fallback a localhost
-const API_URL = "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
+// URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 interface Equipment {
   id: string;
@@ -130,9 +131,14 @@ export default function AperturaCierresContent() {
   // Estados para los modals
   const [showAperturaModal, setShowAperturaModal] = useState(false);
   const [showCierreModal, setShowCierreModal] = useState(false);
+  const [guardandoRegistro, setGuardandoRegistro] = useState(false);
+  const guardandoRegistroRef = useRef(false);
 
   // Función para manejar el envío desde el modal
   const handleModalSubmit = async (modalData: any) => {
+    if (guardandoRegistroRef.current) return;
+    guardandoRegistroRef.current = true;
+    setGuardandoRegistro(true);
     try {
       const userCredentials = localStorage.getItem('userCredentials');
       const userId = localStorage.getItem('userId');
@@ -194,6 +200,9 @@ export default function AperturaCierresContent() {
       } else {
         alert(`Error al registrar el ${modalData?.tipo === 'apertura' ? 'apertura' : 'cierre'}: ${error.message}`);
       }
+    } finally {
+      guardandoRegistroRef.current = false;
+      setGuardandoRegistro(false);
     }
   };
 
@@ -287,12 +296,12 @@ export default function AperturaCierresContent() {
         return;
       }
 
-      const response = await axios.get<UsuarioResponse>(`${API_URL}/usuarios/${userId}`, {
+      const response = await getConReintentos<UsuarioResponse>(() => axios.get<UsuarioResponse>(`${API_URL}/usuarios/${userId}`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
         }
-      });
+      }));
 
       if (response.data.estatus === 1) {
         if (response.data.sucursales && Array.isArray(response.data.sucursales)) {
@@ -304,7 +313,7 @@ export default function AperturaCierresContent() {
         console.error('Error en la respuesta:', response.data.mensaje);
       }
     } catch (error) {
-      console.error('Error al obtener sucursales asignadas:', error);
+      console.error('Error al obtener sucursales asignadas (tras reintentos):', error);
     } finally {
       setLoading(false);
     }
@@ -934,6 +943,7 @@ export default function AperturaCierresContent() {
           tipo="apertura"
           equipmentList={equipmentList}
           sucursalesAsignadas={sucursalesAsignadas}
+          guardando={guardandoRegistro}
         />
       )}
 
@@ -946,6 +956,7 @@ export default function AperturaCierresContent() {
           tipo="cierre"
           equipmentList={equipmentList}
           sucursalesAsignadas={sucursalesAsignadas}
+          guardando={guardandoRegistro}
         />
       )}
     </div>

@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { getConReintentos } from '../services/httpRetry';
 
-// URL de la API - usar variable de entorno o fallback a localhost
-const API_URL = "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
+// URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 interface Merma {
   idMaMe: number;
@@ -34,6 +35,10 @@ export default function MermasContent() {
   // Estados para modales
   const [showNewMermaModal, setShowNewMermaModal] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [guardandoCabecera, setGuardandoCabecera] = useState(false);
+  const [guardandoProductos, setGuardandoProductos] = useState(false);
+  const guardandoCabeceraRef = useRef(false);
+  const guardandoProductosRef = useRef(false);
   const [mermaCreada, setMermaCreada] = useState<any>(null);
   const [motivosMerma, setMotivosMerma] = useState<any[]>([]);
   const [loadingMotivos, setLoadingMotivos] = useState(false);
@@ -83,12 +88,12 @@ export default function MermasContent() {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/usuarios/${userId}`, {
+      const response = await getConReintentos(() => axios.get(`${API_URL}/usuarios/${userId}`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
         }
-      });
+      }));
 
       if (response.data.estatus === 1) {
         if (response.data.sucursales && Array.isArray(response.data.sucursales)) {
@@ -441,6 +446,9 @@ export default function MermasContent() {
 
   // Función para manejar el envío del formulario (Paso 1)
   const handleSubmitPaso1 = async () => {
+    if (guardandoCabeceraRef.current) return;
+    guardandoCabeceraRef.current = true;
+    setGuardandoCabecera(true);
     try {
       const userCredentials = localStorage.getItem('userCredentials');
       const userId = localStorage.getItem('userId');
@@ -521,11 +529,15 @@ export default function MermasContent() {
         console.error('Error al configurar petición:', err?.message);
         alert(`Error: ${err?.message}`);
       }
+    } finally {
+      guardandoCabeceraRef.current = false;
+      setGuardandoCabecera(false);
     }
   };
 
   // Función para finalizar y guardar productos
   const handleFinalizarMerma = async () => {
+    if (guardandoProductosRef.current) return;
     if (productosSeleccionados.length === 0) {
       // Si no hay productos, solo cerrar el modal y refrescar
       setShowNewMermaModal(false);
@@ -541,6 +553,8 @@ export default function MermasContent() {
       return;
     }
 
+    guardandoProductosRef.current = true;
+    setGuardandoProductos(true);
     try {
       const userCredentials = localStorage.getItem('userCredentials');
       if (!userCredentials || !mermaCreada) return;
@@ -591,6 +605,9 @@ export default function MermasContent() {
         console.error('Error al configurar petición:', err?.message);
         alert(`Error: ${err?.message}`);
       }
+    } finally {
+      guardandoProductosRef.current = false;
+      setGuardandoProductos(false);
     }
   };
 
@@ -1029,9 +1046,9 @@ export default function MermasContent() {
           </div>
         </div>
 
-        {/* Responsive rendering */}
-        {typeof window !== 'undefined' && window.innerWidth < 768 ? (
-          loadingRecords ? (
+        {/* Vista móvil: tarjetas (oculta en escritorio) */}
+        <div className="md:hidden">
+          {loadingRecords ? (
             <div style={{ padding: 40, textAlign: 'center', color: '#4a5568' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                 Cargando registros...
@@ -1099,9 +1116,11 @@ export default function MermasContent() {
                 </div>
               ))}
             </div>
-          )
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
+          )}
+        </div>
+
+        {/* Vista de escritorio: tabla completa (oculta en móvil) */}
+        <div className="hidden md:block" style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f7fafc' }}>
@@ -1181,36 +1200,36 @@ export default function MermasContent() {
                 )}
               </tbody>
             </table>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Modal para Nueva Merma - 2 Pasos */}
       {showNewMermaModal && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
-          background: 'rgba(0,0,0,0.5)', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          zIndex: 1000 
-        }}>
-          <div style={{ 
-            background: 'white', 
-            borderRadius: 12, 
-            padding: 32, 
-            maxWidth: currentStep === 1 ? '500px' : '800px', 
-            width: '90%',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}>
+        <div
+          className="items-end sm:items-center"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div
+            className={`w-full rounded-t-2xl sm:rounded-2xl p-4 sm:p-8 ${currentStep === 1 ? 'sm:max-w-[500px]' : 'sm:max-w-[800px]'}`}
+            style={{
+              background: 'white',
+              maxHeight: '92vh',
+              overflowY: 'auto'
+            }}
+          >
             
             {/* Indicador de pasos */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24, gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24, gap: 12, flexWrap: 'wrap' }}>
               <div style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -1219,13 +1238,13 @@ export default function MermasContent() {
                 background: currentStep === 1 ? '#e53e3e' : '#38a169',
                 color: 'white',
                 borderRadius: 20,
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: 600
               }}>
                 {currentStep === 1 ? '1️⃣' : '✅'} Datos de Merma
               </div>
               <div style={{ 
-                width: 40, 
+                width: 30, 
                 height: 2, 
                 background: currentStep === 2 ? '#38a169' : '#e2e8f0' 
               }}></div>
@@ -1237,7 +1256,7 @@ export default function MermasContent() {
                 background: currentStep === 2 ? '#e53e3e' : '#e2e8f0',
                 color: currentStep === 2 ? 'white' : '#4a5568',
                 borderRadius: 20,
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: 600
               }}>
                 2️⃣ Productos
@@ -1358,6 +1377,7 @@ export default function MermasContent() {
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                   <button 
                     onClick={() => setShowNewMermaModal(false)}
+                    disabled={guardandoCabecera}
                     style={{ 
                       padding: '12px 24px', 
                       background: '#e2e8f0', 
@@ -1372,7 +1392,7 @@ export default function MermasContent() {
                   </button>
                   <button 
                     onClick={handleSubmitPaso1}
-                    disabled={!nuevaMerma.idCentro || !nuevaMerma.Anfitrion}
+                    disabled={guardandoCabecera || !nuevaMerma.idCentro || !nuevaMerma.Anfitrion}
                     style={{ 
                       padding: '12px 24px', 
                       background: (!nuevaMerma.idCentro || !nuevaMerma.Anfitrion) ? '#cbd5e0' : '#2368b3',
@@ -1384,7 +1404,7 @@ export default function MermasContent() {
                       fontWeight: 500
                     }}
                   >
-                    Continuar → Productos
+                    {guardandoCabecera ? 'Guardando...' : 'Continuar → Productos'}
                   </button>
                 </div>
               </>
@@ -1446,32 +1466,36 @@ export default function MermasContent() {
                           <div
                             key={producto.CodigoBarras}
                             onClick={() => agregarProducto(producto)}
+                            className="flex-col sm:flex-row items-start sm:items-center"
                             style={{
                               padding: 12,
                               borderBottom: '1px solid #f7fafc',
                               cursor: 'pointer',
                               display: 'flex',
                               justifyContent: 'space-between',
-                              alignItems: 'center'
+                              gap: 8
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.background = '#f7fafc'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                           >
-                            <div>
-                              <div style={{ fontWeight: 600, color: '#2d3748' }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontWeight: 600, color: '#2d3748', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {producto.Producto}
                               </div>
                               <div style={{ fontSize: 14, color: '#4a5568' }}>
                                 Código: {producto.CodigoBarras}
                               </div>
                             </div>
-                            <button style={{
+                            <button className="w-full sm:w-auto" style={{
                               background: '#38a169',
                               color: 'white',
                               border: 'none',
                               borderRadius: 6,
-                              padding: '4px 8px',
-                              fontSize: 12
+                              padding: '8px 14px',
+                              fontSize: 13,
+                              fontWeight: 600,
+                              minHeight: 36,
+                              flexShrink: 0
                             }}>
                               ➕ Agregar
                             </button>
@@ -1507,26 +1531,26 @@ export default function MermasContent() {
                       {productosSeleccionados.map((producto, index) => (
                         <div
                           key={producto.CodigoBarras}
+                          className="flex-col sm:flex-row items-stretch sm:items-center"
                           style={{
                             padding: 16,
                             borderBottom: index < productosSeleccionados.length - 1 ? '1px solid #f7fafc' : 'none',
                             display: 'flex',
-                            alignItems: 'center',
-                            gap: 16
+                            gap: 12
                           }}
                         >
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, color: '#2d3748', marginBottom: 4 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, color: '#2d3748', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {producto.Producto}
                             </div>
                             <div style={{ fontSize: 14, color: '#4a5568' }}>
                               {producto.CodigoBarras}
                             </div>
                           </div>
-                          
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 200 }}>
+
+                          <div className="flex-row sm:flex-col" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                             {/* Cantidad */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
                               <label style={{ fontSize: 12, color: '#4a5568', minWidth: 60 }}>Cantidad:</label>
                               <input
                                 type="number"
@@ -1534,50 +1558,60 @@ export default function MermasContent() {
                                 onChange={(e) => actualizarCantidad(producto.CodigoBarras, e.target.value)}
                                 min="1"
                                 style={{
-                                  width: 80,
-                                  padding: '4px 6px',
+                                  width: '100%',
+                                  maxWidth: 90,
+                                  padding: '8px 6px',
                                   border: '1px solid #e2e8f0',
-                                  borderRadius: 4,
+                                  borderRadius: 6,
                                   textAlign: 'center',
-                                  fontSize: 12
+                                  fontSize: 14,
+                                  minHeight: 36
                                 }}
                               />
                             </div>
-                            
-                            {/* Motivo */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <label style={{ fontSize: 12, color: '#4a5568', minWidth: 60 }}>Motivo:</label>
-                              <select
-                                value={producto.idMotMer || ''}
-                                onChange={(e) => actualizarMotivo(producto.CodigoBarras, e.target.value)}
-                                style={{
-                                  flex: 1,
-                                  padding: '4px 6px',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: 4,
-                                  fontSize: 12
-                                }}
-                              >
-                                <option value="">Seleccionar motivo</option>
-                                {motivosMerma.map(motivo => (
-                                  <option key={motivo.idMotMer} value={motivo.idMotMer}>
-                                    {motivo.Motivo}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
                           </div>
-                          
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                            <label style={{ fontSize: 12, color: '#4a5568', minWidth: 50, flexShrink: 0 }}>Motivo:</label>
+                            <select
+                              value={producto.idMotMer || ''}
+                              onChange={(e) => actualizarMotivo(producto.CodigoBarras, e.target.value)}
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                padding: '8px 8px',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: 6,
+                                fontSize: 13,
+                                minHeight: 36
+                              }}
+                            >
+                              <option value="">Seleccionar motivo</option>
+                              {motivosMerma.map(motivo => (
+                                <option key={motivo.idMotMer} value={motivo.idMotMer}>
+                                  {motivo.Motivo}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
                           <button
                             onClick={() => eliminarProducto(producto.CodigoBarras)}
+                            aria-label="Eliminar producto"
+                            className="self-end sm:self-center"
                             style={{
                               background: '#e53e3e',
                               color: 'white',
                               border: 'none',
-                              borderRadius: 6,
-                              padding: '6px 12px',
+                              borderRadius: 8,
+                              width: 40,
+                              height: 40,
+                              flexShrink: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               cursor: 'pointer',
-                              fontSize: 14
+                              fontSize: 16
                             }}
                           >
                             🗑️
@@ -1592,6 +1626,7 @@ export default function MermasContent() {
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between' }}>
                   <button 
                     onClick={() => setCurrentStep(1)}
+                    disabled={guardandoProductos}
                     style={{ 
                       padding: '12px 24px', 
                       background: '#e2e8f0', 
@@ -1607,6 +1642,7 @@ export default function MermasContent() {
                   
                   <button 
                     onClick={handleFinalizarMerma}
+                    disabled={guardandoProductos}
                     style={{ 
                       padding: '12px 24px', 
                       background: '#38a169',
@@ -1618,7 +1654,7 @@ export default function MermasContent() {
                       fontWeight: 500
                     }}
                   >
-                    ✅ Finalizar Merma
+                    {guardandoProductos ? 'Guardando productos...' : '✅ Finalizar Merma'}
                   </button>
                 </div>
               </>
@@ -1629,41 +1665,49 @@ export default function MermasContent() {
 
       {/* Modal de Detalles de Merma */}
       {showDetalleModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: 12,
-            padding: 24,
-            minWidth: '600px',
-            maxWidth: '800px',
-            maxHeight: '80vh',
-            overflow: 'auto',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h2 style={{ margin: 0, fontSize: 24, fontWeight: 'bold', color: '#1a202c' }}>
+        <div
+          className="items-end sm:items-center"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div
+            className="w-full sm:max-w-[800px] rounded-t-2xl sm:rounded-2xl p-4 sm:p-6"
+            style={{
+              background: 'white',
+              maxHeight: '92vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 'bold', color: '#1a202c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 📋 Detalle de Merma #{mermaDetalle?.idMaMe}
               </h2>
               <button
                 onClick={() => setShowDetalleModal(false)}
+                aria-label="Cerrar"
                 style={{
-                  background: 'none',
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#f1f5f9',
                   border: 'none',
-                  fontSize: 24,
+                  borderRadius: 10,
+                  fontSize: 20,
                   cursor: 'pointer',
-                  color: '#718096',
-                  padding: 4
+                  color: '#4a5568'
                 }}
               >
                 ×
@@ -1682,7 +1726,7 @@ export default function MermasContent() {
                 <h3 style={{ margin: '0 0 12px 0', fontSize: 18, fontWeight: '600', color: '#2d3748' }}>
                   Información General
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 14 }}>
+                <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 12, fontSize: 14 }}>
                   <div>
                     <strong>Sucursal:</strong> {mermaDetalle.nombreSucursal || getBranchName(mermaDetalle.idCentro)}
                   </div>
@@ -1721,80 +1765,147 @@ export default function MermasContent() {
                   📦 No hay productos registrados en esta merma
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-                    <thead>
-                      <tr style={{ background: '#edf2f7' }}>
-                        <th style={{ padding: 10, textAlign: 'left', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
-                          Código
-                        </th>
-                        <th style={{ padding: 10, textAlign: 'left', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
-                          Producto
-                        </th>
-                        <th style={{ padding: 10, textAlign: 'center', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
-                          Cantidad
-                        </th>
-                        <th style={{ padding: 10, textAlign: 'center', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
-                          Precio Unit.
-                        </th>
-                        <th style={{ padding: 10, textAlign: 'center', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
-                          Total Pérdida
-                        </th>
-                        <th style={{ padding: 10, textAlign: 'left', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
-                          Motivo
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {productosDetalle.map((producto, index) => {
-                        const cantidad = parseFloat(producto.Cantidad) || 0;
-                        const precio = parseFloat(producto.Precio || 0);
-                        const totalPerdida = cantidad * precio;
-                        
-                        return (
-                          <tr key={index} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                            <td style={{ padding: 10, border: '1px solid #e2e8f0', fontFamily: 'monospace' }}>
-                              {producto.CodigoBarras}
-                            </td>
-                            <td style={{ padding: 10, border: '1px solid #e2e8f0' }}>
-                              {producto.nombreProducto || 'Producto no encontrado'}
-                            </td>
-                            <td style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                              {producto.Cantidad}
-                            </td>
-                            <td style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace' }}>
-                              ${precio.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                            <td style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace', fontWeight: '600', color: '#e53e3e' }}>
-                              ${totalPerdida.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                            <td style={{ padding: 10, border: '1px solid #e2e8f0' }}>
-                              {producto.descripcionMotivo || 'Sin motivo'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {/* Fila de total */}
-                      {productosDetalle.length > 0 && (
-                        <tr style={{ background: '#f7fafc', fontWeight: '600' }}>
-                          <td colSpan={4} style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'right' }}>
-                            <strong>Total de la Merma:</strong>
-                          </td>
-                          <td style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace', color: '#e53e3e', fontSize: 16 }}>
-                            <strong>
-                              ${productosDetalle.reduce((sum, p) => {
-                                const cantidad = parseFloat(p.Cantidad) || 0;
-                                const precio = parseFloat(p.Precio || 0);
-                                return sum + (cantidad * precio);
-                              }, 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </strong>
-                          </td>
-                          <td style={{ padding: 10, border: '1px solid #e2e8f0' }}></td>
+                <>
+                  {/* Vista de escritorio: tabla completa (oculta en móvil) */}
+                  <div className="hidden md:block" style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                      <thead>
+                        <tr style={{ background: '#edf2f7' }}>
+                          <th style={{ padding: 10, textAlign: 'left', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
+                            Código
+                          </th>
+                          <th style={{ padding: 10, textAlign: 'left', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
+                            Producto
+                          </th>
+                          <th style={{ padding: 10, textAlign: 'center', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
+                            Cantidad
+                          </th>
+                          <th style={{ padding: 10, textAlign: 'center', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
+                            Precio Unit.
+                          </th>
+                          <th style={{ padding: 10, textAlign: 'center', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
+                            Total Pérdida
+                          </th>
+                          <th style={{ padding: 10, textAlign: 'left', fontWeight: '600', color: '#4a5568', border: '1px solid #e2e8f0' }}>
+                            Motivo
+                          </th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {productosDetalle.map((producto, index) => {
+                          const cantidad = parseFloat(producto.Cantidad) || 0;
+                          const precio = parseFloat(producto.Precio || 0);
+                          const totalPerdida = cantidad * precio;
+
+                          return (
+                            <tr key={index} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                              <td style={{ padding: 10, border: '1px solid #e2e8f0', fontFamily: 'monospace' }}>
+                                {producto.CodigoBarras}
+                              </td>
+                              <td style={{ padding: 10, border: '1px solid #e2e8f0' }}>
+                                {producto.nombreProducto || 'Producto no encontrado'}
+                              </td>
+                              <td style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                                {producto.Cantidad}
+                              </td>
+                              <td style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace' }}>
+                                ${precio.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace', fontWeight: '600', color: '#e53e3e' }}>
+                                ${totalPerdida.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td style={{ padding: 10, border: '1px solid #e2e8f0' }}>
+                                {producto.descripcionMotivo || 'Sin motivo'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {/* Fila de total */}
+                        {productosDetalle.length > 0 && (
+                          <tr style={{ background: '#f7fafc', fontWeight: '600' }}>
+                            <td colSpan={4} style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'right' }}>
+                              <strong>Total de la Merma:</strong>
+                            </td>
+                            <td style={{ padding: 10, border: '1px solid #e2e8f0', textAlign: 'center', fontFamily: 'monospace', color: '#e53e3e', fontSize: 16 }}>
+                              <strong>
+                                ${productosDetalle.reduce((sum, p) => {
+                                  const cantidad = parseFloat(p.Cantidad) || 0;
+                                  const precio = parseFloat(p.Precio || 0);
+                                  return sum + (cantidad * precio);
+                                }, 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </strong>
+                            </td>
+                            <td style={{ padding: 10, border: '1px solid #e2e8f0' }}></td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Vista móvil: tarjetas (ocultas en escritorio) */}
+                  <div className="md:hidden" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {productosDetalle.map((producto, index) => {
+                      const cantidad = parseFloat(producto.Cantidad) || 0;
+                      const precio = parseFloat(producto.Precio || 0);
+                      const totalPerdida = cantidad * precio;
+
+                      return (
+                        <div
+                          key={index}
+                          style={{
+                            background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0',
+                            padding: 12, fontSize: 13.5,
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontWeight: 700, color: '#2d3748', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {producto.nombreProducto || 'Producto no encontrado'}
+                              </div>
+                              <div style={{ color: '#718096', fontFamily: 'monospace', fontSize: 12 }}>
+                                {producto.CodigoBarras}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#e53e3e', fontSize: 14 }}>
+                              ${totalPerdida.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          </div>
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e2e8f0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                            <div>
+                              <span style={{ color: '#a0aec0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Cantidad</span>
+                              <div style={{ color: '#2d3748' }}>{producto.Cantidad}</div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#a0aec0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Precio Unit.</span>
+                              <div style={{ color: '#2d3748', fontFamily: 'monospace' }}>
+                                ${precio.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <span style={{ color: '#a0aec0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>Motivo</span>
+                              <div style={{ color: '#2d3748' }}>{producto.descripcionMotivo || 'Sin motivo'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {productosDetalle.length > 0 && (
+                      <div style={{
+                        background: '#f7fafc', borderRadius: 10, border: '1px solid #e2e8f0',
+                        padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}>
+                        <strong style={{ color: '#4a5568', fontSize: 13.5 }}>Total de la Merma:</strong>
+                        <strong style={{ color: '#e53e3e', fontFamily: 'monospace', fontSize: 16 }}>
+                          ${productosDetalle.reduce((sum, p) => {
+                            const cantidad = parseFloat(p.Cantidad) || 0;
+                            const precio = parseFloat(p.Precio || 0);
+                            return sum + (cantidad * precio);
+                          }, 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 
@@ -1802,14 +1913,16 @@ export default function MermasContent() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 20 }}>
               <button
                 onClick={() => setShowDetalleModal(false)}
+                className="w-full sm:w-auto"
                 style={{
-                  padding: '10px 20px',
+                  padding: '12px 20px',
                   background: '#e2e8f0',
                   color: '#4a5568',
                   border: 'none',
-                  borderRadius: 6,
+                  borderRadius: 8,
                   cursor: 'pointer',
-                  fontWeight: '500'
+                  fontWeight: '600',
+                  minHeight: 44
                 }}
               >
                 Cerrar

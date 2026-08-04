@@ -14,20 +14,26 @@ const withPWA = withPWAInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // La configuración appDir ya no es necesaria en Next.js 15
-  // El App Router está habilitado por defecto
   reactStrictMode: true,
-  // Deshabilitar ESLint durante el build (solo temporalmente para la PWA)
-  eslint: {
-    ignoreDuringBuilds: true,
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
+  experimental: {
+    // Los endpoints del dashboard pueden superar el límite predeterminado
+    // de 30 s del proxy de rewrites. Evitar que Next responda 500 antes que la API.
+    proxyTimeout: 120000,
   },
-  // Deshabilitar TypeScript strict checking durante el build
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  // Configurar variables de entorno para el cliente
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  },
+  // Proxy para evitar CORS en desarrollo y acceso desde celular
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
+    return [
+      {
+        source: '/backend/:path*',
+        destination: `${backendUrl}/:path*`,
+      },
+    ];
   },
 };
 
