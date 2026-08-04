@@ -11,9 +11,11 @@ import UserTable from '../components/UserTable';
 import ValoresContent from '../components/ValoresContent';
 import AperturaCierresContent from '../components/AperturaCierresContent';
 import MermasContent from '../components/MermasContent';
+import ProximosCaducarContent from '../components/ProximosCaducarContent';
+import RecuperacionesContent from '../components/RecuperacionesContent';
 
-// URL de la API - usar variable de entorno o fallback a localhost
-const API_URL = "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
+// URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 interface User {
   idUsuarios: number;
@@ -95,6 +97,10 @@ function DashboardContent() {
         setActivePanel('apertura-cierres');
       } else if (panel === 'mermas') {
         setActivePanel('mermas');
+      } else if (panel === 'proximoscaducar') {
+        setActivePanel('proximoscaducar');
+      } else if (panel === 'recuperaciones') {
+        setActivePanel('recuperaciones');
       } else {
         setActivePanel('dashboard');
       }
@@ -456,6 +462,22 @@ function DashboardContent() {
               {!isMenuCollapsed && <span className="nav-text">Manejo de Mermas</span>}
             </div>
 
+            <div 
+              className={`nav-item ${activePanel === 'proximoscaducar' ? 'active' : ''}`}
+              onClick={() => handleNavClick('proximoscaducar', '/dashboard?panel=proximoscaducar')}
+            >
+              <span className="nav-icon">📅</span>
+              {!isMenuCollapsed && <span className="nav-text">Próximos a Caducar</span>}
+            </div>
+
+            <div 
+              className={`nav-item ${activePanel === 'recuperaciones' ? 'active' : ''}`}
+              onClick={() => handleNavClick('recuperaciones', '/dashboard?panel=recuperaciones')}
+            >
+              <span className="nav-icon">🔄</span>
+              {!isMenuCollapsed && <span className="nav-text">Recuperaciones</span>}
+            </div>
+
             <div
               className="nav-item"
               onClick={() => {
@@ -473,11 +495,13 @@ function DashboardContent() {
       <div className="main-content">
         <div className="top-bar">
           <h1 className="page-title">
-            {activePanel === 'dashboard' && <DashboardOverview userLevel={userLevel} />}
+            {activePanel === 'dashboard' && 'Dashboard'}
             {activePanel === 'users' && 'Gestión de Usuarios'}
             {activePanel === 'valores' && 'Manejo de Valores'}
             {activePanel === 'apertura-cierres' && 'Apertura y Cierres'}
             {activePanel === 'mermas' && 'Manejo de Mermas'}
+            {activePanel === 'proximoscaducar' && 'Próximos a Caducar'}
+            {activePanel === 'recuperaciones' && 'Recuperaciones'}
           </h1>
         </div>
 
@@ -616,6 +640,14 @@ function DashboardContent() {
 
           {activePanel === 'mermas' && (
             <MermasContent />
+          )}
+
+          {activePanel === 'recuperaciones' && (
+            <RecuperacionesContent />
+          )}
+
+          {activePanel === 'proximoscaducar' && (
+            <ProximosCaducarContent />
           )}
         </div>
       </div>

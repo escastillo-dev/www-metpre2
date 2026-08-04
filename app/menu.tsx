@@ -39,6 +39,11 @@ export default function Menu() {
               📉 Manejo de Mermas
             </Link>
           </li>
+          <li className="menu-item">
+            <Link href="/dashboard?panel=proximoscaducar" className="menu-link">
+              🗓️ Próximos a Caducar
+            </Link>
+          </li>
         </ul>
       </nav>
     </div>
