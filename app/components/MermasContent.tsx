@@ -709,10 +709,6 @@ export default function MermasContent() {
     }
   };
 
-  const handleEditarMerma = (mermaId: number) => {
-    alert(`Función de edición para merma ${mermaId} - Por implementar`);
-  };
-
   // Calcular estadísticas dinámicas
   const stats = React.useMemo(() => {
     const hoy = new Date().toISOString().split('T')[0];
@@ -1123,21 +1119,6 @@ export default function MermasContent() {
                     >
                       👁️ Ver
                     </button>
-                    <button 
-                      title="Editar" 
-                      onClick={() => handleEditarMerma(record.idMaMe)}
-                      style={{ 
-                        padding: '8px 16px', 
-                        background: '#38a169', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: 8, 
-                        cursor: 'pointer', 
-                        fontSize: 14 
-                      }}
-                    >
-                      ✏️ Editar
-                    </button>
                   </div>
                 </div>
               ))}
@@ -1203,21 +1184,6 @@ export default function MermasContent() {
                             }}
                           >
                             👁️
-                          </button>
-                          <button 
-                            title="Editar" 
-                            onClick={() => handleEditarMerma(record.idMaMe)}
-                            style={{ 
-                              padding: '6px 12px', 
-                              background: '#38a169', 
-                              color: 'white', 
-                              border: 'none', 
-                              borderRadius: 6, 
-                              cursor: 'pointer', 
-                              fontSize: 14 
-                            }}
-                          >
-                            ✏️
                           </button>
                         </div>
                       </td>
@@ -1527,107 +1493,66 @@ export default function MermasContent() {
 
       {/* Modal de Detalles de Merma */}
       {showDetalleModal && (
-        <div
-          className="items-end sm:items-center"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            className="w-full sm:max-w-[800px] rounded-t-2xl sm:rounded-2xl p-4 sm:p-6"
-            style={{
-              background: 'white',
-              maxHeight: '92vh',
-              overflow: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 8 }}>
-              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 'bold', color: '#1a202c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={modalOverlay}>
+          <div style={{ ...modalContent, maxWidth: 800 }}>
+
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#2368b3', fontSize: 18, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 📋 Detalle de Merma #{mermaDetalle?.idMaMe}
-              </h2>
+              </h3>
               <button
                 onClick={() => setShowDetalleModal(false)}
                 aria-label="Cerrar"
-                style={{
-                  width: 40,
-                  height: 40,
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: 10,
-                  fontSize: 20,
-                  cursor: 'pointer',
-                  color: '#4a5568'
-                }}
+                style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#a0aec0', lineHeight: 1 }}
               >
-                ×
+                x
               </button>
             </div>
 
-            {/* Información General de la Merma */}
-            {mermaDetalle && (
-              <div style={{ 
-                background: '#f7fafc', 
-                padding: 16, 
-                borderRadius: 8, 
-                marginBottom: 20,
-                border: '1px solid #e2e8f0'
-              }}>
-                <h3 style={{ margin: '0 0 12px 0', fontSize: 18, fontWeight: '600', color: '#2d3748' }}>
-                  Información General
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 12, fontSize: 14 }}>
-                  <div>
-                    <strong>Sucursal:</strong> {mermaDetalle.nombreSucursal || getBranchName(mermaDetalle.idCentro)}
-                  </div>
-                  <div>
-                    <strong>Fecha:</strong> {formatDate(mermaDetalle.fecha)}
-                  </div>
-                  <div>
-                    <strong>Usuario:</strong> {mermaDetalle.nombreUsuario}
-                  </div>
-                  <div>
-                    <strong>Anfitrión:</strong> {mermaDetalle.nombreAnfitrion}
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Body */}
+            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-            {/* Lista de Productos */}
-            <div>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: '600', color: '#2d3748' }}>
-                Productos de la Merma
-              </h3>
-              
-              {loadingDetalle ? (
-                <div style={{ textAlign: 'center', padding: 20, color: '#718096' }}>
-                  Cargando productos...
+              {/* Información General de la Merma */}
+              {mermaDetalle && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                  {[
+                    { label: 'Sucursal', value: mermaDetalle.nombreSucursal || getBranchName(mermaDetalle.idCentro) },
+                    { label: 'Fecha', value: formatDate(mermaDetalle.fecha) },
+                    { label: 'Usuario', value: mermaDetalle.nombreUsuario },
+                    { label: 'Anfitrión', value: mermaDetalle.nombreAnfitrion },
+                  ].map(item => (
+                    <div key={item.label} style={{ background: '#f8f9fa', borderRadius: 8, padding: 12 }}>
+                      <div style={{ fontSize: 11, color: '#a0aec0', fontWeight: 600, textTransform: 'uppercase', marginBottom: 2 }}>{item.label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#2d3748' }}>{item.value}</div>
+                    </div>
+                  ))}
                 </div>
-              ) : productosDetalle.length === 0 ? (
-                <div style={{ 
-                  textAlign: 'center', 
-                  padding: 20, 
-                  color: '#718096',
-                  background: '#f7fafc',
-                  borderRadius: 8,
-                  border: '1px dashed #cbd5e0'
-                }}>
-                  📦 No hay productos registrados en esta merma
-                </div>
-              ) : (
-                <>
+              )}
+
+              {/* Lista de Productos */}
+              <div>
+                <h4 style={{ margin: '0 0 16px 0', fontSize: 15, fontWeight: 600, color: '#2d3748' }}>
+                  Productos de la Merma
+                </h4>
+
+                {loadingDetalle ? (
+                  <div style={{ textAlign: 'center', padding: 20, color: '#718096', fontSize: 13 }}>
+                    Cargando productos...
+                  </div>
+                ) : productosDetalle.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: 20,
+                    color: '#a0aec0',
+                    background: '#f8f9fa',
+                    borderRadius: 8,
+                    fontSize: 13
+                  }}>
+                    📦 No hay productos registrados en esta merma
+                  </div>
+                ) : (
+                  <>
                   {/* Vista de escritorio: tabla completa (oculta en móvil) */}
                   <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
@@ -1769,23 +1694,14 @@ export default function MermasContent() {
                   </div>
                 </>
               )}
+              </div>
             </div>
 
-            {/* Botones de acción */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 20 }}>
+            {/* Footer */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowDetalleModal(false)}
-                className="w-full sm:w-auto"
-                style={{
-                  padding: '12px 20px',
-                  background: '#e2e8f0',
-                  color: '#4a5568',
-                  border: 'none',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  minHeight: 44
-                }}
+                style={btnSecondary}
               >
                 Cerrar
               </button>
