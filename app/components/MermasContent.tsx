@@ -7,6 +7,32 @@ import { getConReintentos } from '../services/httpRetry';
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
+// --- Estilos del modal (idénticos a ProximosCaducarContent, para consistencia visual) ---
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '8px 12px', border: '1px solid #ced4da',
+  borderRadius: 6, fontSize: 14, boxSizing: 'border-box', minHeight: 44,
+};
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: 12, fontWeight: 600, color: '#6c757d',
+  marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5,
+};
+const btnPrimary: React.CSSProperties = {
+  background: '#2368b3', color: 'white', border: 'none', borderRadius: 8,
+  padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44,
+};
+const btnSecondary: React.CSSProperties = {
+  background: '#f8f9fa', color: '#2d3748', border: '1px solid #e2e8f0', borderRadius: 8,
+  padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', minHeight: 44,
+};
+const modalOverlay: React.CSSProperties = {
+  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+  zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+};
+const modalContent: React.CSSProperties = {
+  background: 'white', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+  width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto',
+};
+
 interface Merma {
   idMaMe: number;
   idCentro: string;
@@ -1205,203 +1231,127 @@ export default function MermasContent() {
 
       {/* Modal para Nueva Merma - 2 Pasos */}
       {showNewMermaModal && (
-        <div
-          className="items-end sm:items-center"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div
-            className={`w-full rounded-t-2xl sm:rounded-2xl p-4 sm:p-8 ${currentStep === 1 ? 'sm:max-w-[500px]' : 'sm:max-w-[800px]'}`}
-            style={{
-              background: 'white',
-              maxHeight: '92vh',
-              overflowY: 'auto'
-            }}
-          >
-            
-            {/* Indicador de pasos */}
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24, gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 8,
-                padding: '8px 16px',
-                background: currentStep === 1 ? '#e53e3e' : '#38a169',
-                color: 'white',
-                borderRadius: 20,
-                fontSize: 13,
-                fontWeight: 600
-              }}>
-                {currentStep === 1 ? '1️⃣' : '✅'} Datos de Merma
+        <div style={modalOverlay}>
+          <div style={{ ...modalContent, maxWidth: currentStep === 1 ? 560 : 680 }}>
+
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#2368b3', fontSize: 18, fontWeight: 700 }}>📉 Registrar Nueva Merma</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                  <span style={{
+                    padding: '4px 12px',
+                    background: currentStep === 1 ? '#e53e3e' : '#38a169',
+                    color: 'white', borderRadius: 20, fontSize: 11, fontWeight: 600
+                  }}>
+                    {currentStep === 1 ? '1️⃣ Datos' : '✅ Datos'}
+                  </span>
+                  <div style={{ width: 24, height: 2, background: currentStep === 2 ? '#38a169' : '#e2e8f0' }} />
+                  <span style={{
+                    padding: '4px 12px',
+                    background: currentStep === 2 ? '#e53e3e' : '#e2e8f0',
+                    color: currentStep === 2 ? 'white' : '#4a5568', borderRadius: 20, fontSize: 11, fontWeight: 600
+                  }}>
+                    2️⃣ Productos
+                  </span>
+                </div>
               </div>
-              <div style={{ 
-                width: 30, 
-                height: 2, 
-                background: currentStep === 2 ? '#38a169' : '#e2e8f0' 
-              }}></div>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 8,
-                padding: '8px 16px',
-                background: currentStep === 2 ? '#e53e3e' : '#e2e8f0',
-                color: currentStep === 2 ? 'white' : '#4a5568',
-                borderRadius: 20,
-                fontSize: 13,
-                fontWeight: 600
-              }}>
-                2️⃣ Productos
-              </div>
+              <button
+                onClick={() => setShowNewMermaModal(false)}
+                disabled={guardandoCabecera || guardandoProductos}
+                style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#a0aec0', lineHeight: 1 }}
+              >
+                x
+              </button>
             </div>
 
             {currentStep === 1 ? (
               // PASO 1: Datos básicos de la merma
               <>
-                <h3 style={{ margin: '0 0 24px 0', color: '#2d3748', fontSize: '24px' }}>
-                  📉 Registrar Nueva Merma
-                </h3>
-                
-                {/* Sucursal */}
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#4a5568' }}>
-                    Sucursal *
-                  </label>
-                  <select 
-                    value={nuevaMerma.idCentro}
-                    onChange={(e) => setNuevaMerma({...nuevaMerma, idCentro: e.target.value})}
-                    style={{ 
-                      width: '100%', 
-                      padding: '12px', 
-                      border: '1px solid #e2e8f0', 
-                      borderRadius: 8,
-                      fontSize: 16
-                    }}
-                  >
-                    <option value="">Seleccione una sucursal</option>
-                    {sucursalesAsignadas.map(sucursal => (
-                      <option key={sucursal.idCentro} value={sucursal.idCentro}>
-                        {sucursal.Sucursal}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Anfitrión */}
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#4a5568' }}>
-                    Número de Nómina del Anfitrión *
-                  </label>
-                  <input 
-                    type="text"
-                    value={nuevaMerma.Anfitrion}
-                    onChange={(e) => setNuevaMerma({...nuevaMerma, Anfitrion: e.target.value})}
-                    placeholder="Ingrese el número de nómina del anfitrión"
-                    style={{ 
-                      width: '100%', 
-                      padding: '12px', 
-                      border: '1px solid #e2e8f0', 
-                      borderRadius: 8,
-                      fontSize: 16
-                    }}
-                  />
-                  <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>
-                    Número de nómina del empleado responsable de la merma
-                  </div>
-                </div>
-
-                {/* Motivo General para productos */}
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#4a5568' }}>
-                    Motivo General (aplicará a todos los productos)
-                  </label>
-                  {loadingMotivos ? (
-                    <div style={{ padding: 12, background: '#f7fafc', borderRadius: 8, textAlign: 'center' }}>
-                      Cargando motivos...
-                    </div>
-                  ) : (
-                    <select 
-                      value={nuevaMerma.motivoGeneral}
-                      onChange={(e) => setNuevaMerma({...nuevaMerma, motivoGeneral: e.target.value})}
-                      style={{ 
-                        width: '100%', 
-                        padding: '12px', 
-                        border: '1px solid #e2e8f0', 
-                        borderRadius: 8,
-                        fontSize: 16
-                      }}
+                <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div>
+                    <label style={labelStyle}>Sucursal *</label>
+                    <select
+                      value={nuevaMerma.idCentro}
+                      onChange={(e) => setNuevaMerma({...nuevaMerma, idCentro: e.target.value})}
+                      style={inputStyle}
                     >
-                      <option value="">Seleccione un motivo general</option>
-                      {motivosMerma.map(motivo => (
-                        <option key={motivo.idMotMer} value={motivo.idMotMer}>
-                          {motivo.Motivo}
+                      <option value="">Seleccione una sucursal</option>
+                      {sucursalesAsignadas.map(sucursal => (
+                        <option key={sucursal.idCentro} value={sucursal.idCentro}>
+                          {sucursal.Sucursal}
                         </option>
                       ))}
                     </select>
-                  )}
-                  <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>
-                    Este motivo se aplicará a todos los productos que agregues (opcional)
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Número de nómina del anfitrión *</label>
+                    <input
+                      type="text"
+                      value={nuevaMerma.Anfitrion}
+                      onChange={(e) => setNuevaMerma({...nuevaMerma, Anfitrion: e.target.value})}
+                      placeholder="Ingrese el número de nómina del anfitrión"
+                      style={inputStyle}
+                    />
+                    <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>
+                      Número de nómina del empleado responsable de la merma
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Motivo general (opcional)</label>
+                    {loadingMotivos ? (
+                      <div style={{ padding: 12, background: '#f7fafc', borderRadius: 8, textAlign: 'center', color: '#718096', fontSize: 13 }}>
+                        Cargando motivos...
+                      </div>
+                    ) : (
+                      <select
+                        value={nuevaMerma.motivoGeneral}
+                        onChange={(e) => setNuevaMerma({...nuevaMerma, motivoGeneral: e.target.value})}
+                        style={inputStyle}
+                      >
+                        <option value="">Seleccione un motivo general</option>
+                        {motivosMerma.map(motivo => (
+                          <option key={motivo.idMotMer} value={motivo.idMotMer}>
+                            {motivo.Motivo}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>
+                      Este motivo se aplicará a todos los productos que agregues
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Observaciones</label>
+                    <textarea
+                      value={nuevaMerma.observaciones}
+                      onChange={(e) => setNuevaMerma({...nuevaMerma, observaciones: e.target.value})}
+                      placeholder="Descripción adicional de la merma..."
+                      rows={2}
+                      style={{ ...inputStyle, resize: 'none', minHeight: 70 }}
+                    />
                   </div>
                 </div>
 
-                {/* Observaciones */}
-                <div style={{ marginBottom: 24 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#4a5568' }}>
-                    Observaciones
-                  </label>
-                  <textarea 
-                    value={nuevaMerma.observaciones}
-                    onChange={(e) => setNuevaMerma({...nuevaMerma, observaciones: e.target.value})}
-                    placeholder="Descripción adicional de la merma..."
-                    rows={3}
-                    style={{ 
-                      width: '100%', 
-                      padding: '12px', 
-                      border: '1px solid #e2e8f0', 
-                      borderRadius: 8,
-                      fontSize: 16,
-                      resize: 'vertical'
-                    }}
-                  />
-                </div>
-
-                {/* Botones Paso 1 */}
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                  <button 
+                {/* Footer Paso 1 */}
+                <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                  <button
                     onClick={() => setShowNewMermaModal(false)}
                     disabled={guardandoCabecera}
-                    style={{ 
-                      padding: '12px 24px', 
-                      background: '#e2e8f0', 
-                      border: 'none', 
-                      borderRadius: 8, 
-                      cursor: 'pointer',
-                      fontSize: 16,
-                      fontWeight: 500
-                    }}
+                    style={{ ...btnSecondary, opacity: guardandoCabecera ? 0.6 : 1 }}
                   >
                     Cancelar
                   </button>
-                  <button 
+                  <button
                     onClick={handleSubmitPaso1}
                     disabled={guardandoCabecera || !nuevaMerma.idCentro || !nuevaMerma.Anfitrion}
-                    style={{ 
-                      padding: '12px 24px', 
-                      background: (!nuevaMerma.idCentro || !nuevaMerma.Anfitrion) ? '#cbd5e0' : '#2368b3',
-                      color: 'white',
-                      border: 'none', 
-                      borderRadius: 8, 
-                      cursor: (!nuevaMerma.idCentro || !nuevaMerma.Anfitrion) ? 'not-allowed' : 'pointer',
-                      fontSize: 16,
-                      fontWeight: 500
+                    style={{
+                      ...btnPrimary,
+                      opacity: (guardandoCabecera || !nuevaMerma.idCentro || !nuevaMerma.Anfitrion) ? 0.5 : 1,
+                      cursor: (!nuevaMerma.idCentro || !nuevaMerma.Anfitrion) ? 'not-allowed' : 'pointer'
                     }}
                   >
                     {guardandoCabecera ? 'Guardando...' : 'Continuar → Productos'}
@@ -1411,248 +1361,160 @@ export default function MermasContent() {
             ) : (
               // PASO 2: Agregar productos
               <>
-                <h3 style={{ margin: '0 0 16px 0', color: '#2d3748', fontSize: '24px' }}>
-                  🛒 Agregar Productos a la Merma
-                </h3>
-                
-                <div style={{ 
-                  background: '#f0f9ff', 
-                  padding: 16, 
-                  borderRadius: 8, 
-                  marginBottom: 24,
-                  border: '1px solid #bae6fd'
-                }}>
-                  <p style={{ margin: 0, color: '#075985', fontSize: 14 }}>
-                    <strong>Merma #{mermaCreada?.idMaMe}</strong> creada exitosamente. 
-                    Ahora puedes agregar los productos afectados.
-                  </p>
-                </div>
+                <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ background: '#f0f9ff', padding: 12, borderRadius: 8, border: '1px solid #bae6fd' }}>
+                    <p style={{ margin: 0, color: '#075985', fontSize: 13 }}>
+                      <strong>Merma #{mermaCreada?.idMaMe}</strong> creada exitosamente.
+                      Ahora puedes agregar los productos afectados.
+                    </p>
+                  </div>
 
-                {/* Buscador de productos */}
-                <div style={{ marginBottom: 24 }}>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: '#4a5568' }}>
-                    🔍 Buscar Producto
-                  </label>
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    placeholder="Buscar por nombre o código de barras..."
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 8,
-                      fontSize: 16
-                    }}
-                  />
-                  
-                  {/* Resultados de búsqueda */}
-                  {searchTerm && (
-                    <div style={{ 
-                      maxHeight: 200, 
-                      overflowY: 'auto', 
-                      border: '1px solid #e2e8f0', 
-                      borderTop: 'none',
-                      borderRadius: '0 0 8px 8px',
-                      background: 'white'
-                    }}>
-                      {loadingProductos ? (
-                        <div style={{ padding: 16, textAlign: 'center', color: '#4a5568' }}>
-                          Buscando productos...
-                        </div>
-                      ) : productos.length > 0 ? (
-                        productos.map(producto => (
-                          <div
-                            key={producto.CodigoBarras}
-                            onClick={() => agregarProducto(producto)}
-                            className="flex-col sm:flex-row items-start sm:items-center"
-                            style={{
-                              padding: 12,
-                              borderBottom: '1px solid #f7fafc',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              gap: 8
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#f7fafc'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                          >
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontWeight: 600, color: '#2d3748', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {producto.Producto}
-                              </div>
-                              <div style={{ fontSize: 14, color: '#4a5568' }}>
-                                Código: {producto.CodigoBarras}
-                              </div>
-                            </div>
-                            <button className="w-full sm:w-auto" style={{
-                              background: '#38a169',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: 6,
-                              padding: '8px 14px',
-                              fontSize: 13,
-                              fontWeight: 600,
-                              minHeight: 36,
-                              flexShrink: 0
-                            }}>
-                              ➕ Agregar
-                            </button>
+                  {/* Buscador de productos */}
+                  <div>
+                    <label style={labelStyle}>🔍 Buscar producto</label>
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      placeholder="Buscar por nombre o código de barras..."
+                      style={{ ...inputStyle, borderRadius: searchTerm ? '8px 8px 0 0' : 8 }}
+                    />
+
+                    {/* Resultados de búsqueda */}
+                    {searchTerm && (
+                      <div style={{
+                        maxHeight: 200,
+                        overflowY: 'auto',
+                        border: '1px solid #e2e8f0',
+                        borderTop: 'none',
+                        borderRadius: '0 0 8px 8px',
+                        background: 'white',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+                      }}>
+                        {loadingProductos ? (
+                          <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>
+                            🔍 Buscando productos...
                           </div>
-                        ))
-                      ) : searchTerm.length >= 2 ? (
-                        <div style={{ padding: 16, textAlign: 'center', color: '#4a5568' }}>
-                          No se encontraron productos
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-
-                {/* Lista de productos seleccionados */}
-                <div style={{ marginBottom: 24 }}>
-                  <h4 style={{ margin: '0 0 16px 0', color: '#2d3748' }}>
-                    📦 Productos Seleccionados ({productosSeleccionados.length})
-                  </h4>
-                  
-                  {productosSeleccionados.length === 0 ? (
-                    <div style={{ 
-                      padding: 24, 
-                      background: '#f7fafc', 
-                      borderRadius: 8, 
-                      textAlign: 'center',
-                      color: '#4a5568'
-                    }}>
-                      No hay productos agregados. Puedes finalizar sin productos o buscar algunos arriba.
-                    </div>
-                  ) : (
-                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                      {productosSeleccionados.map((producto, index) => (
-                        <div
-                          key={producto.CodigoBarras}
-                          className="flex-col sm:flex-row items-stretch sm:items-center"
-                          style={{
-                            padding: 16,
-                            borderBottom: index < productosSeleccionados.length - 1 ? '1px solid #f7fafc' : 'none',
-                            display: 'flex',
-                            gap: 12
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, color: '#2d3748', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {producto.Producto}
-                            </div>
-                            <div style={{ fontSize: 14, color: '#4a5568' }}>
-                              {producto.CodigoBarras}
-                            </div>
-                          </div>
-
-                          <div className="flex-row sm:flex-col" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            {/* Cantidad */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-                              <label style={{ fontSize: 12, color: '#4a5568', minWidth: 60 }}>Cantidad:</label>
-                              <input
-                                type="number"
-                                value={producto.Cantidad}
-                                onChange={(e) => actualizarCantidad(producto.CodigoBarras, e.target.value)}
-                                min="1"
-                                style={{
-                                  width: '100%',
-                                  maxWidth: 90,
-                                  padding: '8px 6px',
-                                  border: '1px solid #e2e8f0',
-                                  borderRadius: 6,
-                                  textAlign: 'center',
-                                  fontSize: 14,
-                                  minHeight: 36
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                            <label style={{ fontSize: 12, color: '#4a5568', minWidth: 50, flexShrink: 0 }}>Motivo:</label>
-                            <select
-                              value={producto.idMotMer || ''}
-                              onChange={(e) => actualizarMotivo(producto.CodigoBarras, e.target.value)}
+                        ) : productos.length > 0 ? (
+                          productos.map(producto => (
+                            <div
+                              key={producto.CodigoBarras}
+                              onClick={() => agregarProducto(producto)}
                               style={{
-                                flex: 1,
-                                minWidth: 0,
-                                padding: '8px 8px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: 6,
-                                fontSize: 13,
-                                minHeight: 36
+                                padding: '10px 16px',
+                                borderBottom: '1px solid #f7fafc',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: 8
                               }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#f0fff4'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                             >
-                              <option value="">Seleccionar motivo</option>
-                              {motivosMerma.map(motivo => (
-                                <option key={motivo.idMotMer} value={motivo.idMotMer}>
-                                  {motivo.Motivo}
-                                </option>
-                              ))}
-                            </select>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {producto.Producto}
+                                </div>
+                                <div style={{ fontSize: 11, color: '#718096', fontFamily: 'monospace', marginTop: 2 }}>
+                                  Código: {producto.CodigoBarras}
+                                </div>
+                              </div>
+                              <span style={{ background: '#38a169', color: 'white', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                ➕ Agregar
+                              </span>
+                            </div>
+                          ))
+                        ) : searchTerm.length >= 2 ? (
+                          <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>
+                            No se encontraron productos
                           </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
 
-                          <button
-                            onClick={() => eliminarProducto(producto.CodigoBarras)}
-                            aria-label="Eliminar producto"
-                            className="self-end sm:self-center"
-                            style={{
-                              background: '#e53e3e',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: 8,
-                              width: 40,
-                              height: 40,
-                              flexShrink: 0,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              fontSize: 16
-                            }}
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {/* Lista de productos seleccionados */}
+                  <div>
+                    <label style={labelStyle}>📦 Productos seleccionados ({productosSeleccionados.length})</label>
+
+                    {productosSeleccionados.length === 0 ? (
+                      <div style={{ padding: 20, background: '#f8f9fa', borderRadius: 8, textAlign: 'center', color: '#a0aec0', fontSize: 13 }}>
+                        No hay productos agregados. Puedes finalizar sin productos o buscar arriba.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {productosSeleccionados.map((producto) => (
+                          <div key={producto.CodigoBarras} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#fafafa' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {producto.Producto}
+                                </div>
+                                <div style={{ fontSize: 11, color: '#718096', fontFamily: 'monospace' }}>
+                                  {producto.CodigoBarras}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => eliminarProducto(producto.CodigoBarras)}
+                                aria-label="Eliminar producto"
+                                style={{
+                                  background: '#fff5f5', color: '#c53030', border: '1px solid #fc8181', borderRadius: 6,
+                                  padding: '6px 10px', cursor: 'pointer', fontSize: 14, flexShrink: 0, minHeight: 32
+                                }}
+                              >
+                                🗑
+                              </button>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <div style={{ width: 90 }}>
+                                <label style={{ ...labelStyle, fontSize: 11 }}>Cantidad</label>
+                                <input
+                                  type="number"
+                                  value={producto.Cantidad}
+                                  onChange={(e) => actualizarCantidad(producto.CodigoBarras, e.target.value)}
+                                  min="1"
+                                  style={{ ...inputStyle, textAlign: 'center' }}
+                                />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 140 }}>
+                                <label style={{ ...labelStyle, fontSize: 11 }}>Motivo</label>
+                                <select
+                                  value={producto.idMotMer || ''}
+                                  onChange={(e) => actualizarMotivo(producto.CodigoBarras, e.target.value)}
+                                  style={inputStyle}
+                                >
+                                  <option value="">Seleccionar motivo</option>
+                                  {motivosMerma.map(motivo => (
+                                    <option key={motivo.idMotMer} value={motivo.idMotMer}>
+                                      {motivo.Motivo}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Botones Paso 2 */}
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between' }}>
-                  <button 
+                {/* Footer Paso 2 */}
+                <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 12, justifyContent: 'space-between' }}>
+                  <button
                     onClick={() => setCurrentStep(1)}
                     disabled={guardandoProductos}
-                    style={{ 
-                      padding: '12px 24px', 
-                      background: '#e2e8f0', 
-                      border: 'none', 
-                      borderRadius: 8, 
-                      cursor: 'pointer',
-                      fontSize: 16,
-                      fontWeight: 500
-                    }}
+                    style={{ ...btnSecondary, opacity: guardandoProductos ? 0.6 : 1 }}
                   >
                     ← Volver
                   </button>
-                  
-                  <button 
+
+                  <button
                     onClick={handleFinalizarMerma}
                     disabled={guardandoProductos}
-                    style={{ 
-                      padding: '12px 24px', 
-                      background: '#38a169',
-                      color: 'white',
-                      border: 'none', 
-                      borderRadius: 8, 
-                      cursor: 'pointer',
-                      fontSize: 16,
-                      fontWeight: 500
-                    }}
+                    style={{ ...btnPrimary, background: '#38a169', opacity: guardandoProductos ? 0.6 : 1 }}
                   >
                     {guardandoProductos ? 'Guardando productos...' : '✅ Finalizar Merma'}
                   </button>
