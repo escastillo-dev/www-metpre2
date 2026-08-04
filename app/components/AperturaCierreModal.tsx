@@ -19,10 +19,11 @@ interface Sucursal {
 interface AperturaCierreModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: any) => Promise<void>;
   equipmentList: Equipment[];
   sucursalesAsignadas: Sucursal[];
   tipo: 'apertura' | 'cierre';
+  guardando: boolean;
 }
 
 const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
@@ -31,7 +32,8 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
   onSubmit,
   equipmentList,
   sucursalesAsignadas,
-  tipo
+  tipo,
+  guardando
 }) => {
   const [formData, setFormData] = useState({
     sucursal: '',
@@ -124,18 +126,21 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
   };
 
   const handleNext = () => {
+    if (guardando) return;
     if (validateCurrentStep() && currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     }
   };
 
   const handlePrev = () => {
+    if (guardando) return;
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (guardando) return;
     if (validateCurrentStep()) {
       // Prepare data for submission
       const equipmentsForAPI: any[] = [];
@@ -156,8 +161,7 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
         equipos: equipmentsForAPI
       };
 
-      onSubmit(modalData);
-      onClose();
+      await onSubmit(modalData);
     }
   };
 
@@ -268,6 +272,7 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
           </div>
           <button 
             onClick={onClose}
+            disabled={guardando}
             style={{
               background: 'rgba(255, 255, 255, 0.2)',
               border: 'none',
@@ -287,7 +292,7 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
         </div>
 
         {/* Progress Bar */}
-        <div style={{ padding: '0 32px' }}>
+        <div style={{ padding: isMobile ? '0 12px' : '0 32px' }}>
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -298,8 +303,9 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
             {[1, 2, 3].map((step) => (
               <div key={step} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                 <div style={{
-                  width: '40px',
-                  height: '40px',
+                  width: stepperCircle,
+                  height: stepperCircle,
+                  flexShrink: 0,
                   borderRadius: '50%',
                   background: currentStep >= step 
                     ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
@@ -309,7 +315,7 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: '600',
-                  fontSize: '16px'
+                  fontSize: stepperFont
                 }}>
                   {step}
                 </div>
@@ -318,7 +324,7 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                     flex: 1,
                     height: '2px',
                     background: currentStep > step ? (tipo === 'apertura' ? '#667eea' : '#f093fb') : '#e2e8f0',
-                    margin: '0 16px'
+                    margin: isMobile ? '0 6px' : '0 16px'
                   }} />
                 )}
               </div>
@@ -745,7 +751,8 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            padding: windowWidth < 768 ? '10px 8px' : '12px 16px',
+                            padding: windowWidth < 768 ? '12px 8px' : '12px 16px',
+                            minHeight: 44,
                             border: `2px solid ${equipmentEvaluations[equipment.id]?.status === status.value ? status.color : '#e2e8f0'}`,
                             borderRadius: '8px',
                             cursor: 'pointer',
@@ -865,10 +872,98 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
           padding: windowWidth < 768 ? '16px 10px' : '24px 32px',
           background: '#f9fafb',
         }}>
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Acción principal primero: más accesible con el pulgar en móvil */}
+              {currentStep < totalSteps ? (
+                <button
+                  onClick={handleNext}
+                  disabled={guardando || !validateCurrentStep()}
+                  style={{
+                    padding: '14px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    background: validateCurrentStep()
+                      ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
+                      : '#e2e8f0',
+                    color: validateCurrentStep() ? 'white' : '#a0aec0',
+                    cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    width: '100%',
+                    minHeight: 48
+                  }}
+                >
+                  Siguiente →
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={guardando || !validateCurrentStep()}
+                  style={{
+                    padding: '14px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    background: validateCurrentStep()
+                      ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
+                      : '#e2e8f0',
+                    color: validateCurrentStep() ? 'white' : '#a0aec0',
+                    cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    width: '100%',
+                    minHeight: 48
+                  }}
+                >
+                  {guardando ? 'Guardando...' : `✅ Registrar ${tipo === 'apertura' ? 'Apertura' : 'Cierre'}`}
+                </button>
+              )}
+
+              {/* Acciones secundarias en fila compacta */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={handlePrev}
+                  disabled={guardando || currentStep === 1}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    background: currentStep === 1 ? '#f7fafc' : 'white',
+                    color: currentStep === 1 ? '#a0aec0' : '#4a5568',
+                    cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    flex: 1,
+                    minHeight: 44
+                  }}
+                >
+                  ← Anterior
+                </button>
+                <button
+                  onClick={onClose}
+                  disabled={guardando}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    background: 'white',
+                    color: '#4a5568',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    flex: 1,
+                    minHeight: 44
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
           <div style={{ display: buttonStack, gap: buttonGap, justifyContent: 'flex-end', alignItems: 'center' }}>
             <button
               onClick={handlePrev}
-              disabled={currentStep === 1}
+              disabled={guardando || currentStep === 1}
               style={{
                 padding: windowWidth < 768 ? '12px' : '12px 24px',
                 border: '1px solid #e2e8f0',
@@ -886,6 +981,7 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
 
             <button
               onClick={onClose}
+              disabled={guardando}
               style={{
                 padding: windowWidth < 768 ? '12px' : '12px 24px',
                 border: '1px solid #e2e8f0',
@@ -904,7 +1000,7 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
             {currentStep < totalSteps ? (
               <button
                 onClick={handleNext}
-                disabled={!validateCurrentStep()}
+                disabled={guardando || !validateCurrentStep()}
                 style={{
                   padding: windowWidth < 768 ? '12px' : '12px 24px',
                   border: 'none',
@@ -924,7 +1020,7 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={!validateCurrentStep()}
+                disabled={guardando || !validateCurrentStep()}
                 style={{
                   padding: windowWidth < 768 ? '12px' : '12px 24px',
                   border: 'none',
@@ -939,10 +1035,11 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                   width: windowWidth < 768 ? '100%' : undefined
                 }}
               >
-                ✅ Registrar {tipo === 'apertura' ? 'Apertura' : 'Cierre'}
+                {guardando ? 'Guardando...' : `✅ Registrar ${tipo === 'apertura' ? 'Apertura' : 'Cierre'}`}
               </button>
             )}
           </div>
+          )}
         </div>
       </div>
     </div>

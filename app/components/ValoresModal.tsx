@@ -29,9 +29,10 @@ interface ValoresModalProps {
   setFormData: React.Dispatch<React.SetStateAction<MovimientoFormData>>;
   incidencias: Array<{idIncidencia: number, Incidencia: string}>;
   sucursalesAsignadas: Sucursal[];
+  guardando: boolean;
 }
 
-const ValoresModal: React.FC<ValoresModalProps> = ({ show, onClose, onSubmit, formData, setFormData, incidencias, sucursalesAsignadas }) => {
+const ValoresModal: React.FC<ValoresModalProps> = ({ show, onClose, onSubmit, formData, setFormData, incidencias, sucursalesAsignadas, guardando }) => {
   if (!show) return null;
   
   return (
@@ -39,7 +40,7 @@ const ValoresModal: React.FC<ValoresModalProps> = ({ show, onClose, onSubmit, fo
       <div className="modal-content">
         <div className="modal-header">
           <h3>Registrar Nuevo Movimiento</h3>
-          <button type="button" className="modal-close" onClick={onClose}>
+          <button type="button" className="modal-close" onClick={onClose} disabled={guardando}>
             ×
           </button>
         </div>
@@ -213,6 +214,7 @@ const ValoresModal: React.FC<ValoresModalProps> = ({ show, onClose, onSubmit, fo
               <button
                 type="button"
                 onClick={onClose}
+                disabled={guardando}
                 style={{
                   padding: "0.75rem 1.5rem",
                   border: "2px solid #e2e8f0",
@@ -220,13 +222,15 @@ const ValoresModal: React.FC<ValoresModalProps> = ({ show, onClose, onSubmit, fo
                   backgroundColor: "white",
                   color: "#4a5568",
                   fontWeight: "500",
-                  cursor: "pointer"
+                  cursor: guardando ? "not-allowed" : "pointer",
+                  opacity: guardando ? 0.6 : 1
                 }}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
+                disabled={guardando}
                 style={{
                   padding: "0.75rem 1.5rem",
                   backgroundColor: "#4CAF50",
@@ -234,10 +238,11 @@ const ValoresModal: React.FC<ValoresModalProps> = ({ show, onClose, onSubmit, fo
                   border: "none",
                   borderRadius: "0.375rem",
                   fontWeight: "500",
-                  cursor: "pointer"
+                  cursor: guardando ? "not-allowed" : "pointer",
+                  opacity: guardando ? 0.75 : 1
                 }}
               >
-                Guardar
+                {guardando ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
           </form>
