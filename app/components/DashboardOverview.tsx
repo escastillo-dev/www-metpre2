@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
-import { Pie, Bar } from 'react-chartjs-2';
+import { Bar, Doughnut } from 'react-chartjs-2';
+import { getConReintentos } from '../services/httpRetry';
+import { useAuth } from '../context';
 
-// URL de la API - usar variable de entorno o fallback a localhost
-const API_URL = "https://met-hmaqcjdea9fsh8ak.mexicocentral-01.azurewebsites.net";
+// URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 ChartJS.register(
   ArcElement,
@@ -18,531 +20,641 @@ ChartJS.register(
   Title
 );
 
-interface DashboardStats {
-  totalUsuarios: number;
-  usuariosPorZona: {
-    [key: string]: {
-      nombre: string;
-      total: number;
-    };
-  };
-  usuariosPorNivel: {
-    [key: string]: {
-      nombre: string;
-      total: number;
-    };
-  };
+// --- Tipos ---------------------------------------------------------------
+
+interface Sucursal {
+  idCentro: string;
+  Sucursal: string;
+}
+
+interface Zona {
+  idZona: number;
+  Zona: string;
+}
+
+interface ResumenResponse {
+  estatus: number;
+  mensaje: string;
+  fechaInicio: string;
+  fechaFin: string;
+  merma: { totalEventos: number; totalImporte: number };
+  recuperaciones: { totalEventos: number; totalImporte: number };
+  caducidad: { criticos: number; urgentes: number; proximos: number; cerrados: number };
+  manejoValores: { foliosAbiertos: number; foliosCerrados: number; totalMovimientos: number };
+}
+
+interface GraficasResponse {
+  estatus: number;
+  mensaje: string;
+  mermaVsRecuperaciones: { mes: string; merma: number; recuperaciones: number }[];
+  topProductosMerma: { CodigoBarras: string; Producto: string | null; totalCantidad: number; importe: number }[];
+  topProductosRecuperacion: { CodigoBarras: string; Producto: string | null; totalCantidad: number; importe: number }[];
+  caducidadPorZona: { idZona: number; Zona: string | null; criticos: number; urgentes: number; proximos: number }[];
+  mermaPorMotivo: { idMotMer: number; Motivo: string | null; totalEventos: number; importe: number }[];
+  recuperacionPorTipo: { idTipoRecuperacion: number; Tipo: string | null; totalEventos: number; importe: number }[];
+}
+
+interface Filtros {
+  fecha_inicio: string;
+  fecha_fin: string;
+  idCentro: string;
+  idZona: string;
 }
 
 interface DashboardOverviewProps {
+  /** Reservado por si en el futuro se requiere mostrar/ocultar controles puntuales según el nivel del usuario. */
   userLevel?: string;
 }
 
-const DashboardOverview: React.FC<DashboardOverviewProps> = ({ userLevel }) => {
-  const [stats, setStats] = useState<{
-    totalUsuarios: number;
-    usuariosPorZona: { [key: string]: number };
-    usuariosPorNivel: { [key: string]: number };
-  }>({
-    totalUsuarios: 0,
-    usuariosPorZona: {},
-    usuariosPorNivel: {},
-  });
+// --- Helpers ---------------------------------------------------------------
 
-  // Estados para métricas de mermas
-  const [mermasStats, setMermasStats] = useState<{
-    totalPerdidas: number;
-    totalMermas: number;
-    mermasHoy: number;
-    mermasMes: number;
-    sucursalesConMermas: number;
-  }>({
-    totalPerdidas: 0,
-    totalMermas: 0,
-    mermasHoy: 0,
-    mermasMes: 0,
-    sucursalesConMermas: 0,
-  });
+const MESES_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadingMermas, setLoadingMermas] = useState(true);
+function formatMes(mesStr: string): string {
+  if (!mesStr || !mesStr.includes('-')) return mesStr || '';
+  const [y, m] = mesStr.split('-');
+  const idx = parseInt(m, 10) - 1;
+  const abbr = MESES_ABBR[idx] ?? m;
+  return `${abbr} ${y.slice(2)}`;
+}
 
-  useEffect(() => {
-    const fetchDashboardStats = async () => {
-      try {
-        console.log('Iniciando carga de estadísticas...');
-        
-        const userCredentials = localStorage.getItem('userCredentials');
-        if (!userCredentials) {
-          console.error('No se encontraron las credenciales');
-          return;
-        }
-        
-        // Configurar los headers para la petición
-        const headers = {
-          'Authorization': `Basic ${userCredentials}`,
-          'Content-Type': 'application/json'
-        };
+function truncar(str: string | null | undefined, n = 25): string {
+  const val = str || 'Sin nombre';
+  return val.length > n ? `${val.slice(0, n - 1)}…` : val;
+}
 
-        console.log('Headers a enviar:', headers);
+const currencyFmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+const formatMXN = (v: number) => currencyFmt.format(v || 0);
 
-        // Realizar la petición directamente a la URL completa
-        const response = await axios.get(`${API_URL}/stats/dashboard`, { 
-          headers,
-          withCredentials: true
-        });
-        console.log('Respuesta del dashboard:', response.data);
+function getDefaultDates(): { fecha_inicio: string; fecha_fin: string } {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const toISO = (d: Date) => d.toISOString().slice(0, 10);
+  return { fecha_inicio: toISO(first), fecha_fin: toISO(now) };
+}
 
-        if (response.data.estatus === 1) {
-          const { data } = response.data;
-          
-          // Procesar datos para las gráficas
-          const usuariosPorZona: { [key: string]: number } = {};
-          const usuariosPorNivel: { [key: string]: number } = {};
+const getHeaders = () => ({
+  Authorization: `Basic ${localStorage.getItem('userCredentials')}`,
+  'Content-Type': 'application/json',
+});
+// Paletas de color
+const COLOR_MERMA = '#f26722';
+const COLOR_RECUPERACION = '#38a169';
+const COLOR_CRITICO = '#e53e3e';
+const COLOR_URGENTE = '#ed8936';
+const COLOR_PROXIMO = '#ecc94b';
+const COLOR_CERRADO = '#a0aec0';
+const COLOR_VALORES = '#2368b3';
 
-          // Procesar usuarios por zona y ordenar por total
-          Object.entries(data.usuariosPorZona)
-            .sort(([, a]: [string, any], [, b]: [string, any]) => b.total - a.total)
-            .forEach(([id, info]: [string, any]) => {
-              usuariosPorZona[info.nombre] = info.total;
-            });
+const SHADES_ORANGE = ['#f26722', '#f4813f', '#f6995e', '#f8b17d', '#fac99c', '#fce1bb', '#feefda'];
+const SHADES_GREEN = ['#276749', '#2f855a', '#38a169', '#48bb78', '#68d391', '#9ae6b4', '#c6f6d5'];
 
-          // Procesar usuarios por nivel y ordenar por total
-          Object.entries(data.usuariosPorNivel)
-            .sort(([, a]: [string, any], [, b]: [string, any]) => b.total - a.total)
-            .forEach(([id, info]: [string, any]) => {
-              usuariosPorNivel[info.nombre] = info.total;
-            });
+// --- Componentes de UI reutilizables -----------------------------------------
 
-          console.log('Datos procesados:', {
-            totalUsuarios: data.totalUsuarios,
-            usuariosPorZona,
-            usuariosPorNivel
-          });
+const cardStyle: React.CSSProperties = {
+  background: '#fff', borderRadius: 12, padding: 20,
+  boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0',
+};
 
-          setStats({
-            totalUsuarios: data.totalUsuarios,
-            usuariosPorZona,
-            usuariosPorNivel,
-          });
-        }
-        
-        setIsLoading(false);
+const Skeleton: React.FC<{ height?: number; width?: string }> = ({ height = 20, width = '100%' }) => (
+  <div className="animate-pulse" style={{ height, width, background: '#e2e8f0', borderRadius: 6 }} />
+);
 
-        console.log('Estadísticas cargadas:', stats);
+const ErrorBox: React.FC<{ msg: string }> = ({ msg }) => (
+  <div style={{
+    background: '#fed7d7', color: '#c53030', border: '1px solid #fc8181',
+    borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 500,
+  }}>
+    ⚠️ {msg}
+  </div>
+);
 
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error al obtener estadísticas:', error);
-        setIsLoading(false);
-      }
-    };
+function EmptyState() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: 200, color: '#a0aec0', fontSize: 14, fontWeight: 500,
+    }}>
+      No hay datos disponibles
+    </div>
+  );
+}
 
-    fetchDashboardStats();
-  }, []);
+/** Gráfica de dona con leyenda lateral que muestra el porcentaje de cada segmento */
+function DonutConLeyenda({ labels, data, colors, tooltipPrefix }: {
+  labels: string[]; data: number[]; colors: string[]; tooltipPrefix?: string;
+}) {
+  const total = data.reduce((s, v) => s + v, 0);
+  if (labels.length === 0) return <EmptyState />;
 
-  // Función para obtener estadísticas de mermas
-  const fetchMermasStats = async () => {
-    setLoadingMermas(true);
-    try {
-      console.log('Iniciando carga de estadísticas de mermas...');
-      
-      const userCredentials = localStorage.getItem('userCredentials');
-      const userId = localStorage.getItem('userId');
-      
-      if (!userCredentials || !userId) {
-        console.error('No se encontraron las credenciales o userId');
-        setLoadingMermas(false);
-        return;
-      }
-
-      const headers = {
-        'Authorization': `Basic ${userCredentials}`,
-        'Content-Type': 'application/json'
-      };
-
-      // Obtener sucursales del usuario
-      const userResponse = await axios.get(`${API_URL}/usuarios/${userId}`, { headers });
-      
-      if (userResponse.data.estatus !== 1 || !userResponse.data.sucursales) {
-        console.error('No se pudieron obtener las sucursales del usuario');
-        setLoadingMermas(false);
-        return;
-      }
-
-      const sucursales = userResponse.data.sucursales;
-      const sucursalesIds = sucursales.map((s: any) => s.idCentro).join(',');
-
-      // Obtener mermas de las sucursales del usuario
-      const mermasResponse = await axios.get(`${API_URL}/mermas/sucursales/${sucursalesIds}`, { headers });
-      
-      if (mermasResponse.data.estatus === 1) {
-        const mermas = mermasResponse.data.mermas || [];
-        
-        // Calcular estadísticas
-        const hoy = new Date().toISOString().split('T')[0];
-        const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-        
-        const mermasHoy = mermas.filter((m: any) => m.Fecha >= hoy).length;
-        const mermasMes = mermas.filter((m: any) => m.Fecha >= inicioMes).length;
-        const sucursalesUnicas = new Set(mermas.map((m: any) => m.idCentro)).size;
-
-        // Calcular total de pérdidas
-        let totalPerdidas = 0;
-        for (const merma of mermas) {
-          try {
-            const productosResponse = await axios.get(`${API_URL}/mermas/${merma.idMaMe}/productos`, { headers });
-            if (productosResponse.data.estatus === 1) {
-              const productos = productosResponse.data.productos || [];
-              const valorMerma = productos.reduce((suma: number, producto: any) => {
-                const cantidad = parseFloat(producto.Cantidad) || 0;
-                const precio = parseFloat(producto.Precio || 0);
-                return suma + (cantidad * precio);
-              }, 0);
-              totalPerdidas += valorMerma;
-            }
-          } catch (error) {
-            console.error(`Error al obtener productos de merma ${merma.idMaMe}:`, error);
-          }
-        }
-
-        setMermasStats({
-          totalPerdidas: totalPerdidas,
-          totalMermas: mermas.length,
-          mermasHoy: mermasHoy,
-          mermasMes: mermasMes,
-          sucursalesConMermas: sucursalesUnicas,
-        });
-
-        console.log('Estadísticas de mermas calculadas:', {
-          totalPerdidas,
-          totalMermas: mermas.length,
-          mermasHoy,
-          mermasMes,
-          sucursalesConMermas: sucursalesUnicas,
-        });
-      }
-    } catch (error) {
-      console.error('Error al obtener estadísticas de mermas:', error);
-    } finally {
-      setLoadingMermas(false);
-    }
+  const chartData = {
+    labels,
+    datasets: [{ data, backgroundColor: colors, borderColor: '#fff', borderWidth: 2 }],
   };
-
-  // useEffect para cargar estadísticas de mermas
-  useEffect(() => {
-    if (!isLoading) { // Solo cargar mermas después de cargar usuarios
-      fetchMermasStats();
-    }
-  }, [isLoading]);
-
-  const zonasChartData = {
-    labels: Object.keys(stats.usuariosPorZona),
-    datasets: [
-      {
-        data: Object.values(stats.usuariosPorZona),
-        backgroundColor: [
-          '#2368b3',  // Azul principal
-          '#64b5f6',  // Azul claro
-          '#1976d2',  // Azul medio
-          '#0d47a1',  // Azul oscuro
-          '#bbdefb',  // Azul muy claro
-          '#1565c0',  // Azul medio oscuro
-        ],
-        borderColor: '#fff',
-        borderWidth: 2,
-      },
-    ],
-  };
-
-  // Opciones adicionales para el gráfico de zonas
-  const zonasChartOptions = {
+  const options = {
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: 'bottom' as const,
-        labels: {
-          padding: 20,
-          font: {
-            size: 12
-          }
-        }
-      },
+      legend: { display: false },
       tooltip: {
         callbacks: {
-          label: function(context: any) {
-            const total = stats.totalUsuarios;
-            const value = context.raw || 0;
-            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
-            return `${context.label}: ${value} usuarios (${percentage}%)`;
-          }
-        }
-      }
-    }
-  };
-
-  const nivelesChartData = {
-    labels: Object.keys(stats.usuariosPorNivel),
-    datasets: [
-      {
-        label: 'Usuarios por Nivel',
-        data: Object.values(stats.usuariosPorNivel),
-        backgroundColor: [
-          '#2368b3',  // Azul principal
-          '#64b5f6',  // Azul claro
-          '#1976d2',  // Azul medio
-        ],
-        borderRadius: 8,
-        maxBarThickness: 50,
+          label: (ctx: any) => {
+            const value = ctx.raw || 0;
+            const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+            return `${tooltipPrefix ?? ''}${ctx.label}: ${formatMXN(value)} (${pct}%)`;
+          },
+        },
       },
-    ],
+    },
   };
-
-  if (isLoading) {
-    return <div>Cargando estadísticas...</div>;
-  }
-
-  // Si el usuario no es Admin, mostrar imagen alternativa
-  if (userLevel !== 'Admin') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-2xl p-12 max-w-2xl w-full mx-auto transform transition-all">
-          <div className="flex flex-col items-center">
-            <div className="mb-8 p-6 bg-gray-50 rounded-full">
-              <img 
-                src="/window.svg" 
-                alt="Acceso Restringido" 
-                className="w-32 h-32" 
-                style={{ 
-                  filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1))'
-                }}
-              />
-            </div>
-            <div className="text-center space-y-4">
-              <h2 className="text-4xl font-bold" style={{ color: '#2368b3' }}>
-                Acceso Restringido
-              </h2>
-              <p className="text-2xl font-semibold" style={{ color: '#f26722' }}>
-                Área Administrativa
-              </p>
-              <p className="text-gray-600 text-lg max-w-md mx-auto">
-                Esta sección del panel está disponible solo para usuarios administradores.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="dashboard-overview w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-      <div className="stats-header mb-8">
-        {/* Grid de Métricas Principales - RESPONSIVE: 1 col móvil, 2 tablet, 3 desktop */}
-        <div className="stats-grid">
-          {/* Total Usuarios */}
-          <div className="stat-card bg-white p-4 sm:p-6 rounded-xl shadow-md text-center border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="m-0 text-blue-600 text-base font-semibold">Total Usuarios</h3>
-              <div className="bg-blue-50 text-blue-600 rounded-lg p-2 text-xl">👥</div>
+    <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ flex: '1 1 200px', height: 240, position: 'relative', minWidth: 200 }}>
+        <Doughnut data={chartData} options={options} />
+      </div>
+      <div style={{ flex: '1 1 160px', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 160 }}>
+        {labels.map((label, i) => {
+          const value = data[i] || 0;
+          const pct = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+          return (
+            <div key={`${label}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: colors[i % colors.length], flexShrink: 0 }} />
+              <span style={{ color: '#4a5568', flex: 1 }}>{label}</span>
+              <span style={{ color: '#2d3748', fontWeight: 700 }}>{pct}%</span>
             </div>
-            <p className="text-4xl m-0 text-gray-800 font-bold">{stats.totalUsuarios}</p>
-            <span className="text-sm text-gray-600">Usuarios activos</span>
-          </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-          {/* Total Pérdidas */}
-          <div className="stat-card bg-white p-4 sm:p-6 rounded-xl shadow-md text-center border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="m-0 text-red-600 text-base font-semibold">Pérdidas Totales</h3>
-              <div className="bg-red-50 text-red-600 rounded-lg p-2 text-xl">💰</div>
-            </div>
-            <p className="text-3xl m-0 text-red-600 font-bold">
-              {loadingMermas ? '...' : `$${mermasStats.totalPerdidas.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            </p>
-            <span className="text-sm text-gray-600">Valor en dinero</span>
-          </div>
+const DashboardOverview: React.FC<DashboardOverviewProps> = () => {
+  const { state: authState } = useAuth();
+  const defaults = useMemo(() => getDefaultDates(), []);
 
-          {/* Total Mermas */}
-          <div className="stat-card bg-white p-4 sm:p-6 rounded-xl shadow-md text-center border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="m-0 text-orange-500 text-base font-semibold">Total Mermas</h3>
-              <div className="bg-orange-50 text-orange-500 rounded-lg p-2 text-xl">📊</div>
-            </div>
-            <p className="text-4xl m-0 text-gray-800 font-bold">
-              {loadingMermas ? '...' : mermasStats.totalMermas}
-            </p>
-            <span className="text-sm text-gray-600">Registros totales</span>
-          </div>
+  // Filtros del formulario (lo que el usuario está editando) vs. filtros aplicados (los usados en el último fetch)
+  const [filtrosForm, setFiltrosForm] = useState<Filtros>({ ...defaults, idCentro: '', idZona: '' });
 
-          {/* Mermas del Mes */}
-          <div className="stat-card bg-white p-4 sm:p-6 rounded-xl shadow-md text-center border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="m-0 text-green-600 text-base font-semibold">Mermas del Mes</h3>
-              <div className="bg-green-50 text-green-600 rounded-lg p-2 text-xl">📈</div>
-            </div>
-            <p className="text-4xl m-0 text-gray-800 font-bold">
-              {loadingMermas ? '...' : mermasStats.mermasMes}
-            </p>
-            <span className="text-sm text-gray-600">Este mes</span>
+  // Catálogos (se cargan una sola vez)
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [zonas, setZonas] = useState<Zona[]>([]);
+
+  // KPIs
+  const [resumen, setResumen] = useState<ResumenResponse | null>(null);
+  const [loadingResumen, setLoadingResumen] = useState(true);
+  const [errorResumen, setErrorResumen] = useState<string | null>(null);
+
+  // Gráficas
+  const [graficas, setGraficas] = useState<GraficasResponse | null>(null);
+  const [loadingGraficas, setLoadingGraficas] = useState(true);
+  const [errorGraficas, setErrorGraficas] = useState<string | null>(null);
+
+  // --- Fetchers ---------------------------------------------------------
+
+  const buildParams = (f: Filtros) => {
+    const params: Record<string, string> = {};
+    // /dashboard/resumen y /dashboard/graficas no aceptan el parámetro
+    // "sucursales"; su contrato utiliza idCentro o idZona.
+    if (f.idCentro) params.idCentro = f.idCentro;
+    if (f.idZona) params.idZona = f.idZona;
+    if (f.fecha_inicio) params.fecha_inicio = f.fecha_inicio;
+    if (f.fecha_fin) params.fecha_fin = f.fecha_fin;
+    return params;
+  };
+
+  const fetchResumen = useCallback(async (f: Filtros) => {
+    setLoadingResumen(true);
+    setErrorResumen(null);
+    try {
+      const res = await axios.get(`${API_URL}/dashboard/resumen`, {
+        headers: getHeaders(),
+        params: buildParams(f),
+      });
+      if (res.data?.estatus === 1) {
+        setResumen(res.data);
+      } else {
+        setErrorResumen(res.data?.mensaje || 'No se pudo cargar el resumen.');
+      }
+    } catch (error: unknown) {
+      const mensaje = axios.isAxiosError(error)
+        ? error.response?.data?.mensaje || error.response?.data?.detail ||
+          `Error HTTP ${error.response?.status || 'sin respuesta'}`
+        : error instanceof Error ? error.message : 'Error desconocido';
+      setErrorResumen(`No se pudo cargar el resumen: ${mensaje}`);
+    } finally {
+      setLoadingResumen(false);
+    }
+  }, []);
+
+  const fetchGraficas = useCallback(async (f: Filtros) => {
+    setLoadingGraficas(true);
+    setErrorGraficas(null);
+    try {
+      const res = await axios.get(`${API_URL}/dashboard/graficas`, {
+        headers: getHeaders(),
+        params: buildParams(f),
+      });
+      if (res.data?.estatus === 1) {
+        setGraficas(res.data);
+      } else {
+        setErrorGraficas(res.data?.mensaje || 'No se pudieron cargar las gráficas.');
+      }
+    } catch (error: unknown) {
+      const mensaje = axios.isAxiosError(error)
+        ? error.response?.data?.mensaje || error.response?.data?.detail ||
+          `Error HTTP ${error.response?.status || 'sin respuesta'}`
+        : error instanceof Error ? error.message : 'Error desconocido';
+      setErrorGraficas(`No se pudieron cargar las gráficas: ${mensaje}`);
+    } finally {
+      setLoadingGraficas(false);
+    }
+  }, []);
+
+  // Catálogos de filtros — una sola vez al montar
+  // La Sucursal se restringe a las asignadas al usuario (mismo patrón que Recuperaciones/Valores/Mermas).
+  // La Zona sigue siendo un catálogo general.
+  useEffect(() => {
+    const loadCatalogos = async () => {
+      if (authState.loading || !authState.isAuthenticated) return;
+
+      const sucursalesGlobales = authState.sucursales;
+      setSucursales(sucursalesGlobales);
+
+      const filtrosIniciales = sucursalesGlobales.length === 1
+        ? { ...defaults, idCentro: sucursalesGlobales[0].idCentro, idZona: '' }
+        : { ...defaults, idCentro: '', idZona: '' };
+
+      if (sucursalesGlobales.length === 1) {
+        setFiltrosForm(filtrosIniciales);
+      }
+
+      // Iniciar los datos del dashboard inmediatamente. El catálogo de zonas
+      // continúa en paralelo y no bloquea estas dos solicitudes.
+      fetchResumen(filtrosIniciales)
+        .then(() => fetchGraficas(filtrosIniciales));
+
+      // Nota: las peticiones de usuario (sucursales asignadas) y zonas se resuelven
+      // de forma INDEPENDIENTE con Promise.allSettled. Antes se usaba Promise.all,
+      // lo que provocaba que si /zonas fallaba (ej. timeout del backend), se perdían
+      // también las sucursales asignadas obtenidas correctamente desde /usuarios/{userId}.
+      const [usuarioResult, zonaResult] = await Promise.allSettled([
+        Promise.resolve({ data: { estatus: 1, sucursales: sucursalesGlobales } }),
+        getConReintentos(() => axios.get(`${API_URL}/zonas`, { headers: getHeaders() })),
+      ]);
+
+      let asignadas: Sucursal[] = [];
+      if (usuarioResult.status === 'fulfilled') {
+        const usuarioRes = usuarioResult.value;
+        if (usuarioRes && usuarioRes.data?.estatus === 1 && Array.isArray(usuarioRes.data.sucursales)) {
+          asignadas = usuarioRes.data.sucursales;
+          setSucursales(asignadas);
+        } else if (usuarioRes) {
+          console.error('Dashboard: respuesta de /usuarios/{id} sin sucursales válidas:', usuarioRes.data);
+        }
+      } else {
+        console.error('Dashboard: error al obtener sucursales asignadas del usuario:', usuarioResult.reason);
+      }
+
+      if (zonaResult.status === 'fulfilled') {
+        const zonaRes = zonaResult.value;
+        const zonaList = zonaRes.data?.items || zonaRes.data?.zonas || zonaRes.data || [];
+        setZonas(Array.isArray(zonaList) ? zonaList : []);
+      } else {
+        console.error('Dashboard: error al obtener catálogo de zonas:', zonaResult.reason);
+      }
+
+      // Si el usuario solo tiene una sucursal asignada, se preselecciona automáticamente (igual que en los demás módulos)
+      if (asignadas.length === 1) {
+        const idCentro = asignadas[0].idCentro;
+        setFiltrosForm(f => ({ ...f, idCentro }));
+        return;
+      }
+
+      // Múltiples sucursales asignadas (o ninguna): cargar con los filtros por defecto,
+      // restringiendo SIEMPRE a la lista de sucursales asignadas.
+    };
+    loadCatalogos();
+  }, [authState.loading, authState.isAuthenticated, authState.sucursales, defaults, fetchResumen, fetchGraficas]);
+
+  const handleAplicarFiltros = async () => {
+    await fetchResumen(filtrosForm);
+    await fetchGraficas(filtrosForm);
+  };
+
+  const handleLimpiarFiltros = async () => {
+    const reset: Filtros = { ...getDefaultDates(), idCentro: '', idZona: '' };
+    setFiltrosForm(reset);
+    await fetchResumen(reset);
+    await fetchGraficas(reset);
+  };
+
+  // Nota: el Dashboard es visible para todos los usuarios autenticados.
+  // La restricción de datos se aplica por sucursales asignadas (ver buildParams/fetchResumen/fetchGraficas),
+  // no por nivel de usuario — cada usuario solo ve la información de sus propias sucursales.
+
+  // --- Datos preparados para las gráficas --------------------------------
+
+  const mvr = graficas?.mermaVsRecuperaciones ?? [];
+  const mermaVsRecData = {
+    labels: mvr.map(d => formatMes(d.mes)),
+    datasets: [
+      { label: 'Merma', data: mvr.map(d => d.merma), backgroundColor: COLOR_MERMA, borderRadius: 6, maxBarThickness: 40 },
+      { label: 'Recuperaciones', data: mvr.map(d => d.recuperaciones), backgroundColor: COLOR_RECUPERACION, borderRadius: 6, maxBarThickness: 40 },
+    ],
+  };
+  const mermaVsRecOptions = {
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom' as const, labels: { padding: 16, font: { size: 12 } } },
+      tooltip: { callbacks: { label: (ctx: any) => `${ctx.dataset.label}: ${formatMXN(ctx.raw)}` } },
+    },
+    scales: {
+      y: { beginAtZero: true, ticks: { callback: (v: any) => formatMXN(v) } },
+      x: { grid: { display: false } },
+    },
+  };
+
+  const topMerma = graficas?.topProductosMerma ?? [];
+  const topMermaData = {
+    labels: topMerma.map(p => truncar(p.Producto)),
+    datasets: [{ data: topMerma.map(p => p.importe), backgroundColor: SHADES_ORANGE, borderRadius: 6 }],
+  };
+  const topMermaOptions = {
+    indexAxis: 'y' as const,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx: any) => {
+            const item = topMerma[ctx.dataIndex];
+            return [
+              `Producto: ${truncar(item?.Producto, 40)}`,
+              `Código: ${item?.CodigoBarras ?? '—'}`,
+              `Cantidad: ${item?.totalCantidad ?? 0}`,
+              `Importe: ${formatMXN(item?.importe ?? 0)}`,
+            ];
+          },
+        },
+      },
+    },
+    scales: { x: { beginAtZero: true, ticks: { callback: (v: any) => formatMXN(v) } } },
+  };
+
+  const topRecuperacion = graficas?.topProductosRecuperacion ?? [];
+  const topRecuperacionData = {
+    labels: topRecuperacion.map(p => truncar(p.Producto)),
+    datasets: [{ data: topRecuperacion.map(p => p.importe), backgroundColor: SHADES_GREEN, borderRadius: 6 }],
+  };
+  const topRecuperacionOptions = {
+    indexAxis: 'y' as const,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx: any) => {
+            const item = topRecuperacion[ctx.dataIndex];
+            return [
+              `Producto: ${truncar(item?.Producto, 40)}`,
+              `Código: ${item?.CodigoBarras ?? '—'}`,
+              `Cantidad: ${item?.totalCantidad ?? 0}`,
+              `Importe: ${formatMXN(item?.importe ?? 0)}`,
+            ];
+          },
+        },
+      },
+    },
+    scales: { x: { beginAtZero: true, ticks: { callback: (v: any) => formatMXN(v) } } },
+  };
+
+  const caducidadZona = graficas?.caducidadPorZona ?? [];
+  const caducidadZonaData = {
+    labels: caducidadZona.map(z => z.Zona || 'Sin nombre'),
+    datasets: [
+      { label: 'Críticos', data: caducidadZona.map(z => z.criticos), backgroundColor: COLOR_CRITICO },
+      { label: 'Urgentes', data: caducidadZona.map(z => z.urgentes), backgroundColor: COLOR_URGENTE },
+      { label: 'Próximos', data: caducidadZona.map(z => z.proximos), backgroundColor: COLOR_PROXIMO },
+    ],
+  };
+  const caducidadZonaOptions = {
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom' as const, labels: { padding: 16, font: { size: 12 } } },
+    },
+    scales: {
+      x: { stacked: true, grid: { display: false } },
+      y: { stacked: true, beginAtZero: true },
+    },
+  };
+
+  const mermaMotivo = graficas?.mermaPorMotivo ?? [];
+  const recuperacionTipo = graficas?.recuperacionPorTipo ?? [];
+
+  const kpiCardBase: React.CSSProperties = { ...cardStyle };
+
+  return (
+    <div className="dashboard-overview w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* --- Filtros --- */}
+      <div style={{ ...cardStyle, minWidth: 0 }}>
+        <h3 style={{ margin: '0 0 14px 0', color: '#2d3748', fontSize: 16, fontWeight: 700 }}>🔍 Filtros</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end', minWidth: 0 }}>
+          <div style={{ minWidth: 150 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6c757d', marginBottom: 4 }}>Fecha inicio</label>
+            <input
+              type="date"
+              value={filtrosForm.fecha_inicio}
+              onChange={e => setFiltrosForm(f => ({ ...f, fecha_inicio: e.target.value }))}
+              style={{ padding: '8px 10px', border: '1px solid #ced4da', borderRadius: 6, fontSize: 13, width: '100%' }}
+            />
+          </div>
+          <div style={{ minWidth: 150 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6c757d', marginBottom: 4 }}>Fecha fin</label>
+            <input
+              type="date"
+              value={filtrosForm.fecha_fin}
+              onChange={e => setFiltrosForm(f => ({ ...f, fecha_fin: e.target.value }))}
+              style={{ padding: '8px 10px', border: '1px solid #ced4da', borderRadius: 6, fontSize: 13, width: '100%' }}
+            />
+          </div>
+          <div style={{ minWidth: 180 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6c757d', marginBottom: 4 }}>Sucursal</label>
+            <select
+              value={filtrosForm.idCentro}
+              onChange={e => setFiltrosForm(f => ({ ...f, idCentro: e.target.value }))}
+              style={{ padding: '8px 10px', border: '1px solid #ced4da', borderRadius: 6, fontSize: 13, width: '100%' }}
+            >
+              <option value="">Todas mis sucursales</option>
+              {sucursales.map(s => (
+                <option key={s.idCentro} value={s.idCentro}>{s.Sucursal}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ minWidth: 160 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6c757d', marginBottom: 4 }}>Zona</label>
+            <select
+              value={filtrosForm.idZona}
+              onChange={e => setFiltrosForm(f => ({ ...f, idZona: e.target.value }))}
+              style={{ padding: '8px 10px', border: '1px solid #ced4da', borderRadius: 6, fontSize: 13, width: '100%' }}
+            >
+              <option value="">Todas las zonas</option>
+              {zonas.map(z => (
+                <option key={z.idZona} value={z.idZona}>{z.Zona}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleAplicarFiltros}
+              style={{ background: '#2368b3', color: 'white', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              Aplicar filtros
+            </button>
+            <button
+              onClick={handleLimpiarFiltros}
+              style={{ background: '#f8f9fa', color: '#2d3748', border: '1px solid #e2e8f0', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+            >
+              Limpiar
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Alerta de Pérdidas Altas */}
-      {!loadingMermas && mermasStats.totalPerdidas > 5000 && (
-        <div style={{
-          background: 'linear-gradient(135deg, #fed7d7, #feb2b2)',
-          border: '2px solid #fc8181',
-          borderRadius: '12px',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          boxShadow: '0 4px 12px rgba(252, 129, 129, 0.3)'
-        }}>
-          <div style={{ 
-            fontSize: '3rem',
-            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'
-          }}>🚨</div>
-          <div style={{ flex: 1 }}>
-            <h4 style={{ 
-              margin: '0 0 0.5rem 0', 
-              color: '#c53030', 
-              fontSize: '1.25rem', 
-              fontWeight: '700' 
-            }}>
-              ¡Alerta: Pérdidas Elevadas Detectadas!
-            </h4>
-            <p style={{ 
-              margin: 0, 
-              color: '#c53030', 
-              fontSize: '1rem',
-              fontWeight: '500'
-            }}>
-              Las pérdidas totales han alcanzado ${mermasStats.totalPerdidas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}. 
-              Se recomienda revisar los procesos de control de inventario.
-            </p>
+      {/* --- KPI Cards --- */}
+      {errorResumen && <ErrorBox msg={errorResumen} />}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: 16 }}>
+
+        {/* Merma */}
+        <div style={{ ...kpiCardBase, borderTop: `4px solid ${COLOR_MERMA}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <h4 style={{ margin: 0, color: COLOR_MERMA, fontSize: 14, fontWeight: 700 }}>🟠 MERMA</h4>
           </div>
-          <div style={{
-            background: 'rgba(197, 48, 48, 0.1)',
-            borderRadius: '8px',
-            padding: '12px',
-            textAlign: 'center',
-            minWidth: '120px'
-          }}>
-            <div style={{ color: '#c53030', fontWeight: 'bold', fontSize: '1.1rem' }}>
-              {mermasStats.totalMermas} mermas
+          {loadingResumen ? (
+            <><Skeleton height={28} width="60%" /><div style={{ height: 8 }} /><Skeleton height={18} width="80%" /></>
+          ) : (
+            <>
+              <p style={{ margin: 0, fontSize: 26, fontWeight: 800, color: '#2d3748' }}>{resumen?.merma.totalEventos ?? 0} eventos</p>
+              <span style={{ fontSize: 14, color: COLOR_MERMA, fontWeight: 700 }}>{formatMXN(resumen?.merma.totalImporte ?? 0)}</span>
+            </>
+          )}
+        </div>
+
+        {/* Recuperaciones */}
+        <div style={{ ...kpiCardBase, borderTop: `4px solid ${COLOR_RECUPERACION}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <h4 style={{ margin: 0, color: COLOR_RECUPERACION, fontSize: 14, fontWeight: 700 }}>🟢 RECUPERACIONES</h4>
+          </div>
+          {loadingResumen ? (
+            <><Skeleton height={28} width="60%" /><div style={{ height: 8 }} /><Skeleton height={18} width="80%" /></>
+          ) : (
+            <>
+              <p style={{ margin: 0, fontSize: 26, fontWeight: 800, color: '#2d3748' }}>{resumen?.recuperaciones.totalEventos ?? 0} eventos</p>
+              <span style={{ fontSize: 14, color: COLOR_RECUPERACION, fontWeight: 700 }}>{formatMXN(resumen?.recuperaciones.totalImporte ?? 0)}</span>
+            </>
+          )}
+        </div>
+
+        {/* Caducidad */}
+        <div style={{ ...kpiCardBase, borderTop: `4px solid ${COLOR_CRITICO}` }}>
+          <h4 style={{ margin: '0 0 10px 0', color: COLOR_CRITICO, fontSize: 14, fontWeight: 700 }}>🔴 CADUCIDAD</h4>
+          {loadingResumen ? (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <Skeleton height={26} width="45%" /><Skeleton height={26} width="45%" />
+              <Skeleton height={26} width="45%" /><Skeleton height={26} width="45%" />
             </div>
-            <div style={{ color: '#c53030', fontSize: '0.8rem', opacity: 0.8 }}>
-              registradas
+          ) : (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ background: COLOR_CRITICO, color: 'white', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>{resumen?.caducidad.criticos ?? 0} Críticos</span>
+              <span style={{ background: COLOR_URGENTE, color: 'white', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>{resumen?.caducidad.urgentes ?? 0} Urgentes</span>
+              <span style={{ background: COLOR_PROXIMO, color: '#4a3800', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>{resumen?.caducidad.proximos ?? 0} Próximos</span>
+              <span style={{ background: COLOR_CERRADO, color: 'white', borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>{resumen?.caducidad.cerrados ?? 0} Cerrados</span>
             </div>
+          )}
+        </div>
+
+        {/* Manejo de Valores */}
+        <div style={{ ...kpiCardBase, borderTop: `4px solid ${COLOR_VALORES}` }}>
+          <h4 style={{ margin: '0 0 10px 0', color: COLOR_VALORES, fontSize: 14, fontWeight: 700 }}>🔵 MANEJO DE VALORES</h4>
+          {loadingResumen ? (
+            <><Skeleton height={18} width="70%" /><div style={{ height: 6 }} /><Skeleton height={18} width="70%" /><div style={{ height: 6 }} /><Skeleton height={18} width="70%" /></>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13.5, color: '#2d3748', fontWeight: 600 }}>
+              <span>{resumen?.manejoValores.foliosAbiertos ?? 0} folios abiertos</span>
+              <span>{resumen?.manejoValores.foliosCerrados ?? 0} folios cerrados</span>
+              <span>{resumen?.manejoValores.totalMovimientos ?? 0} movimientos totales</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* --- Gráficas --- */}
+      {errorGraficas && <ErrorBox msg={errorGraficas} />}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: 20 }}>
+
+        {/* 1. Merma vs Recuperaciones */}
+        <div style={cardStyle}>
+          <h3 style={{ margin: '0 0 14px 0', color: '#2d3748', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>📊 Merma vs Recuperaciones</h3>
+          <div style={{ height: 280, position: 'relative' }}>
+            {loadingGraficas ? <Skeleton height={280} /> : mvr.length === 0 ? <EmptyState /> : (
+              <Bar data={mermaVsRecData} options={mermaVsRecOptions} />
+            )}
           </div>
         </div>
-      )}
 
-      {/* Métricas Adicionales de Mermas */}
-      {!loadingMermas && (
-        <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '12px',
-          padding: '2rem',
-          marginBottom: '2rem',
-          color: 'white',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
-        }}>
-          <h3 style={{ 
-            margin: '0 0 1.5rem 0', 
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-            textAlign: 'center'
-          }}>📊 Resumen de Control de Pérdidas</h3>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem'
-          }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                {mermasStats.mermasHoy}
-              </div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Mermas Hoy</div>
-            </div>
-            
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                {mermasStats.sucursalesConMermas}
-              </div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Sucursales con Mermas</div>
-            </div>
-            
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                ${mermasStats.totalMermas > 0 ? (mermasStats.totalPerdidas / mermasStats.totalMermas).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
-              </div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Promedio por Merma</div>
-            </div>
-            
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-                {mermasStats.mermasMes > 0 ? Math.round(mermasStats.mermasMes / new Date().getDate()) : 0}
-              </div>
-              <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Promedio Diario</div>
-            </div>
+        {/* 2. Top productos merma */}
+        <div style={cardStyle}>
+          <h3 style={{ margin: '0 0 14px 0', color: '#2d3748', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>📦 Top productos merma</h3>
+          <div style={{ height: 280, position: 'relative' }}>
+            {loadingGraficas ? <Skeleton height={280} /> : topMerma.length === 0 ? <EmptyState /> : (
+              <Bar data={topMermaData} options={topMermaOptions} />
+            )}
           </div>
         </div>
-      )}
 
-      <div className="charts-grid grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 mt-8">
-        <div className="chart-container bg-white p-4 sm:p-8 rounded-xl shadow-md">
-          <h3 className="m-0 mb-4 sm:mb-6 text-blue-600 text-lg sm:text-2xl font-bold text-center">
-            Distribución por Zona
-          </h3>
-          <div className="h-64 sm:h-80 lg:h-96 relative">
-            <Pie 
-              data={zonasChartData} 
-              options={zonasChartOptions} 
+        {/* 3. Top productos recuperación */}
+        <div style={cardStyle}>
+          <h3 style={{ margin: '0 0 14px 0', color: '#2d3748', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>📦 Top productos recuperación</h3>
+          <div style={{ height: 280, position: 'relative' }}>
+            {loadingGraficas ? <Skeleton height={280} /> : topRecuperacion.length === 0 ? <EmptyState /> : (
+              <Bar data={topRecuperacionData} options={topRecuperacionOptions} />
+            )}
+          </div>
+        </div>
+
+        {/* 4. Caducidad por zona */}
+        <div style={cardStyle}>
+          <h3 style={{ margin: '0 0 14px 0', color: '#2d3748', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>📅 Caducidad por zona</h3>
+          <div style={{ height: 280, position: 'relative' }}>
+            {loadingGraficas ? <Skeleton height={280} /> : caducidadZona.length === 0 ? <EmptyState /> : (
+              <Bar data={caducidadZonaData} options={caducidadZonaOptions} />
+            )}
+          </div>
+        </div>
+
+        {/* 5. Merma por motivo */}
+        <div style={cardStyle}>
+          <h3 style={{ margin: '0 0 14px 0', color: '#2d3748', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>🟠 Merma por motivo</h3>
+          {loadingGraficas ? <Skeleton height={240} /> : (
+            <DonutConLeyenda
+              labels={mermaMotivo.map(m => m.Motivo || 'Sin nombre')}
+              data={mermaMotivo.map(m => m.importe)}
+              colors={SHADES_ORANGE}
             />
-          </div>
+          )}
         </div>
 
-        <div className="chart-container bg-white p-4 sm:p-8 rounded-xl shadow-md">
-          <h3 className="m-0 mb-4 sm:mb-6 text-blue-600 text-lg sm:text-2xl font-bold text-center">
-            Usuarios por Nivel
-          </h3>
-          <div className="h-64 sm:h-80 lg:h-96 relative">
-            <Bar 
-              data={nivelesChartData}
-              options={{
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    position: 'bottom',
-                    labels: {
-                      padding: 20,
-                      font: {
-                        size: 12
-                      }
-                    }
-                  }
-                },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    grid: {
-                      color: 'rgba(0, 0, 0, 0.1)'
-                    }
-                  },
-                  x: {
-                    grid: {
-                      display: false
-                    }
-                  }
-                },
-              }}
+        {/* 6. Recuperación por tipo */}
+        <div style={cardStyle}>
+          <h3 style={{ margin: '0 0 14px 0', color: '#2d3748', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>🟢 Recuperación por tipo</h3>
+          {loadingGraficas ? <Skeleton height={240} /> : (
+            <DonutConLeyenda
+              labels={recuperacionTipo.map(t => t.Tipo || 'Sin nombre')}
+              data={recuperacionTipo.map(t => t.importe)}
+              colors={SHADES_GREEN}
             />
-          </div>
+          )}
         </div>
       </div>
     </div>
