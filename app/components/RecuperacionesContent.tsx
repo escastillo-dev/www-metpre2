@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { getConReintentos } from '../services/httpRetry';
+import BarcodeScannerModal from './BarcodeScannerModal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
@@ -116,6 +117,7 @@ export default function RecuperacionesContent() {
   // Tabla de productos
   const [filas, setFilas] = useState<ProductoFila[]>([crearFila()]);
   const searchTimeouts = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [showScannerFor, setShowScannerFor] = useState<string | null>(null);
 
   // Notificación
   const [notif, setNotif] = useState<{ tipo: 'ok' | 'error'; msg: string } | null>(null);
@@ -226,6 +228,13 @@ export default function RecuperacionesContent() {
     setFilas(prev => prev.map(f =>
       f.id === filaId ? { ...f, producto: p, searchTerm: (p.Producto || p.Descripcion || ''), sugerencias: [] } : f
     ));
+  };
+
+  // Maneja el código escaneado con la cámara para una fila específica
+  const handleBarcodeScanned = (codigo: string) => {
+    const filaId = showScannerFor;
+    setShowScannerFor(null);
+    if (filaId) buscarProducto(filaId, codigo);
   };
 
   const agregarFila = () => setFilas(prev => [...prev, crearFila()]);
@@ -598,13 +607,24 @@ export default function RecuperacionesContent() {
                             </div>
                           ) : (
                             <>
-                              <input
-                                type="text"
-                                placeholder="Buscar por nombre o código..."
-                                value={fila.searchTerm}
-                                onChange={e => buscarProducto(fila.id, e.target.value)}
-                                style={{ ...inputStyle, borderRadius: fila.sugerencias.length > 0 ? '6px 6px 0 0' : 6 }}
-                              />
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <input
+                                  type="text"
+                                  placeholder="Buscar por nombre o código..."
+                                  value={fila.searchTerm}
+                                  onChange={e => buscarProducto(fila.id, e.target.value)}
+                                  style={{ ...inputStyle, flex: 1, borderRadius: fila.sugerencias.length > 0 ? '6px 6px 0 0' : 6 }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowScannerFor(fila.id)}
+                                  aria-label="Escanear código de barras"
+                                  title="Escanear código de barras"
+                                  style={{ ...btnSecondary, padding: '8px 12px', minHeight: 44, flexShrink: 0 }}
+                                >
+                                  📷
+                                </button>
+                              </div>
                               {fila.searchTerm && (
                                 <div style={{ border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 6px 6px', background: 'white', maxHeight: 180, overflowY: 'auto', boxShadow: '0 4px 8px rgba(0,0,0,0.08)', position: 'absolute', width: '100%', zIndex: 10 }}>
                                   {fila.loadingSearch ? (
@@ -662,6 +682,14 @@ export default function RecuperacionesContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de escáner de código de barras */}
+      {showScannerFor && (
+        <BarcodeScannerModal
+          onScan={handleBarcodeScanned}
+          onClose={() => setShowScannerFor(null)}
+        />
       )}
     </div>
   );
