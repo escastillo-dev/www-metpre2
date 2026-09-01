@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getConReintentos } from '../services/httpRetry';
+import BarcodeScannerModal from './BarcodeScannerModal';
 
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
@@ -83,6 +84,7 @@ export default function MermasContent() {
   const [productosSeleccionados, setProductosSeleccionados] = useState<any[]>([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Estados para modal de detalles
   const [showDetalleModal, setShowDetalleModal] = useState(false);
@@ -414,6 +416,13 @@ export default function MermasContent() {
     }, 300); // Esperar 300ms después de que el usuario deje de escribir
 
     setSearchTimeout(newTimeout);
+  };
+
+  // Función para manejar el código escaneado con la cámara
+  const handleBarcodeScanned = (codigo: string) => {
+    setShowScanner(false);
+    setSearchTerm(codigo);
+    buscarProductos(codigo);
   };
 
   // Función para agregar producto a la lista
@@ -1338,13 +1347,24 @@ export default function MermasContent() {
                   {/* Buscador de productos */}
                   <div>
                     <label style={labelStyle}>🔍 Buscar producto</label>
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => handleSearchChange(e.target.value)}
-                      placeholder="Buscar por nombre o código de barras..."
-                      style={{ ...inputStyle, borderRadius: searchTerm ? '8px 8px 0 0' : 8 }}
-                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        placeholder="Buscar por nombre o código de barras..."
+                        style={{ ...inputStyle, flex: 1, borderRadius: searchTerm ? '8px 8px 0 0' : 8 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowScanner(true)}
+                        aria-label="Escanear código de barras"
+                        title="Escanear código de barras"
+                        style={{ ...btnSecondary, padding: '10px 14px', minHeight: 44, flexShrink: 0 }}
+                      >
+                        📷
+                      </button>
+                    </div>
 
                     {/* Resultados de búsqueda */}
                     {searchTerm && (
@@ -1489,6 +1509,14 @@ export default function MermasContent() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Modal de escáner de código de barras */}
+      {showScanner && (
+        <BarcodeScannerModal
+          onScan={handleBarcodeScanned}
+          onClose={() => setShowScanner(false)}
+        />
       )}
 
       {/* Modal de Detalles de Merma */}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { getConReintentos } from '../services/httpRetry';
+import BarcodeScannerModal from './BarcodeScannerModal';
 
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
@@ -162,6 +163,7 @@ export default function ProximosCaducarContent() {
   const [loadingProductos, setLoadingProductos]         = useState(false);
   const [searchTimeout, setSearchTimeout]               = useState<ReturnType<typeof setTimeout> | null>(null);
   const [guardandoNuevo, setGuardandoNuevo]             = useState(false);
+  const [showScanner, setShowScanner]                   = useState(false);
 
   const [showAccionModal, setShowAccionModal] = useState(false);
   const [accionForm, setAccionForm]     = useState({ idTipoAccion: 6, cantidad: '', resultado: 'EN_PROCESO', comentario: '' });
@@ -292,6 +294,12 @@ export default function ProximosCaducarContent() {
     setNuevoForm(f => ({ ...f, codigoBarras: p.CodigoBarras }));
     setProductosSugerencias([]);
     setSearchTermProducto('');
+  };
+
+  // Maneja el código escaneado con la cámara
+  const handleBarcodeScanned = (codigo: string) => {
+    setShowScanner(false);
+    buscarProductos(codigo);
   };
 
   const resetNuevoForm = () => {
@@ -742,13 +750,24 @@ export default function ProximosCaducarContent() {
                   </div>
                 ) : (
                   <>
-                    <input
-                      type="text"
-                      value={searchTermProducto}
-                      onChange={e => buscarProductos(e.target.value)}
-                      placeholder="Buscar por nombre o código de barras..."
-                      style={{ ...inputStyle, borderRadius: productosSugerencias.length > 0 || (searchTermProducto.length >= 2 && !loadingProductos) ? '8px 8px 0 0' : 8 }}
-                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        value={searchTermProducto}
+                        onChange={e => buscarProductos(e.target.value)}
+                        placeholder="Buscar por nombre o código de barras..."
+                        style={{ ...inputStyle, flex: 1, borderRadius: productosSugerencias.length > 0 || (searchTermProducto.length >= 2 && !loadingProductos) ? '8px 8px 0 0' : 8 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowScanner(true)}
+                        aria-label="Escanear código de barras"
+                        title="Escanear código de barras"
+                        style={{ ...btnSecondary, padding: '10px 14px', minHeight: 44, flexShrink: 0 }}
+                      >
+                        📷
+                      </button>
+                    </div>
                     {searchTermProducto && (
                       <div style={{
                         border: '1px solid #e2e8f0',
@@ -815,6 +834,14 @@ export default function ProximosCaducarContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de escáner de código de barras */}
+      {showScanner && (
+        <BarcodeScannerModal
+          onScan={handleBarcodeScanned}
+          onClose={() => setShowScanner(false)}
+        />
       )}
 
       {/* MODAL: Detalle */}
