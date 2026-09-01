@@ -13,6 +13,7 @@ import AperturaCierresContent from '../components/AperturaCierresContent';
 import MermasContent from '../components/MermasContent';
 import ProximosCaducarContent from '../components/ProximosCaducarContent';
 import RecuperacionesContent from '../components/RecuperacionesContent';
+import ProductosConsumidosContent from '../components/ProductosConsumidosContent';
 
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
@@ -101,6 +102,8 @@ function DashboardContent() {
         setActivePanel('proximoscaducar');
       } else if (panel === 'recuperaciones') {
         setActivePanel('recuperaciones');
+      } else if (panel === 'productos-consumidos') {
+        setActivePanel('productos-consumidos');
       } else {
         setActivePanel('dashboard');
       }
@@ -478,6 +481,14 @@ function DashboardContent() {
               {!isMenuCollapsed && <span className="nav-text">Recuperaciones</span>}
             </div>
 
+            <div 
+              className={`nav-item ${activePanel === 'productos-consumidos' ? 'active' : ''}`}
+              onClick={() => handleNavClick('productos-consumidos', '/dashboard?panel=productos-consumidos')}
+            >
+              <span className="nav-icon">📦</span>
+              {!isMenuCollapsed && <span className="nav-text">Productos Consumidos</span>}
+            </div>
+
             <div
               className="nav-item"
               onClick={() => {
@@ -502,6 +513,7 @@ function DashboardContent() {
             {activePanel === 'mermas' && 'Manejo de Mermas'}
             {activePanel === 'proximoscaducar' && 'Próximos a Caducar'}
             {activePanel === 'recuperaciones' && 'Recuperaciones'}
+            {activePanel === 'productos-consumidos' && 'Productos Consumidos'}
           </h1>
         </div>
 
@@ -644,6 +656,10 @@ function DashboardContent() {
 
           {activePanel === 'recuperaciones' && (
             <RecuperacionesContent />
+          )}
+
+          {activePanel === 'productos-consumidos' && (
+            <ProductosConsumidosContent />
           )}
 
           {activePanel === 'proximoscaducar' && (
