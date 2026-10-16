@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface Sucursal {
@@ -78,7 +79,7 @@ const ValoresModal: React.FC<ValoresModalProps> = ({ show, onClose, onSubmit, fo
   };
   if (!show) return null;
   
-  return (
+  return createPortal(
     <div className="modal-overlay">
       <div className="modal-content" ref={containerRef} role="dialog" aria-modal="true" aria-label="Registrar nuevo movimiento" tabIndex={-1}>
         <div className="modal-header">
@@ -325,7 +326,8 @@ const ValoresModal: React.FC<ValoresModalProps> = ({ show, onClose, onSubmit, fo
           </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

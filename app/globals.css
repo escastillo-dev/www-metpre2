@@ -310,5 +310,15 @@ html {
     margin: 1rem auto !important;
     max-height: 90vh !important;
     overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* Mantener el tamaño legible incluso con estilos inline de cada formulario. */
+@media (any-pointer: coarse) {
+  [role="dialog"] input,
+  [role="dialog"] select,
+  [role="dialog"] textarea {
+    font-size: max(16px, 1rem) !important;
   }
 }
