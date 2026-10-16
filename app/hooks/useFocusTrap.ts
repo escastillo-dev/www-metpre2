@@ -13,6 +13,17 @@ const FOCUSABLE_SELECTOR =
 export function useFocusTrap<T extends HTMLElement>(active: boolean, onClose?: () => void) {
   const containerRef = useRef<T | null>(null);
 
+  // Guardamos onClose en un ref para que cambios en su identidad (muy común:
+  // suele pasarse como arrow function inline y se recrea en cada render del
+  // padre, p. ej. al escribir en un input) NO vuelvan a ejecutar el efecto de
+  // abajo. Si el efecto dependiera de onClose directamente, cada tecla
+  // presionada en un campo del modal re-enfocaría el primer elemento
+  // interactivo y el teclado virtual del celular se cerraría.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!active) return;
 
@@ -31,8 +42,8 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean, onClose?: (
     (focusable[0] ?? container).focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && onClose) {
-        onClose();
+      if (e.key === 'Escape' && onCloseRef.current) {
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -57,7 +68,9 @@ export function useFocusTrap<T extends HTMLElement>(active: boolean, onClose?: (
       container.removeEventListener('keydown', handleKeyDown);
       previouslyFocused?.focus();
     };
-  }, [active, onClose]);
+    // Solo reaccionamos a cambios de `active`: ver comentario de onCloseRef arriba.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   return containerRef;
 }
