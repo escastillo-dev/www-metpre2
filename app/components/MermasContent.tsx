@@ -3,36 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getConReintentos } from '../services/httpRetry';
+import { getCached } from '../services/apiCache';
 import BarcodeScannerModal from './BarcodeScannerModal';
+import { inputStyle, labelStyle, btnPrimary, btnSecondary, modalOverlay, modalContent } from '../styles/sharedStyles';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
-
-// --- Estilos del modal (idénticos a ProximosCaducarContent, para consistencia visual) ---
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '8px 12px', border: '1px solid #ced4da',
-  borderRadius: 6, fontSize: 14, boxSizing: 'border-box', minHeight: 44,
-};
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 12, fontWeight: 600, color: '#6c757d',
-  marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5,
-};
-const btnPrimary: React.CSSProperties = {
-  background: '#2368b3', color: 'white', border: 'none', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44,
-};
-const btnSecondary: React.CSSProperties = {
-  background: '#f8f9fa', color: '#2d3748', border: '1px solid #e2e8f0', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', minHeight: 44,
-};
-const modalOverlay: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-  zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-};
-const modalContent: React.CSSProperties = {
-  background: 'white', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-  width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto',
-};
 
 interface Merma {
   idMaMe: number;
@@ -77,6 +54,7 @@ export default function MermasContent() {
     motivoGeneral: '', // Motivo que se aplicará por defecto a todos los productos
     observaciones: ''
   });
+  const [nuevaMermaErrors, setNuevaMermaErrors] = useState<{ idCentro?: string; Anfitrion?: string }>({});
 
   // Estados para búsqueda y gestión de productos
   const [searchTerm, setSearchTerm] = useState('');
@@ -91,6 +69,9 @@ export default function MermasContent() {
   const [mermaDetalle, setMermaDetalle] = useState<any>(null);
   const [productosDetalle, setProductosDetalle] = useState<any[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+
+  const nuevaMermaModalRef = useFocusTrap<HTMLDivElement>(showNewMermaModal, () => setShowNewMermaModal(false));
+  const detalleModalRef = useFocusTrap<HTMLDivElement>(showDetalleModal, () => setShowDetalleModal(false));
 
   // Estado para total de pérdidas en dinero
   const [totalPerdidasDinero, setTotalPerdidasDinero] = useState(0);
@@ -116,21 +97,24 @@ export default function MermasContent() {
         return;
       }
 
-      const response = await getConReintentos(() => axios.get(`${API_URL}/usuarios/${userId}`, {
-        headers: {
-          'Authorization': `Basic ${userCredentials}`,
-          'Content-Type': 'application/json'
-        }
-      }));
+      const data = await getCached(`sucursales_${userId}`, async () => {
+        const res = await getConReintentos(() => axios.get(`${API_URL}/usuarios/${userId}`, {
+          headers: {
+            'Authorization': `Basic ${userCredentials}`,
+            'Content-Type': 'application/json'
+          }
+        }));
+        return res.data;
+      });
 
-      if (response.data.estatus === 1) {
-        if (response.data.sucursales && Array.isArray(response.data.sucursales)) {
-          setSucursalesAsignadas(response.data.sucursales);
+      if (data.estatus === 1) {
+        if (data.sucursales && Array.isArray(data.sucursales)) {
+          setSucursalesAsignadas(data.sucursales);
         } else {
-          console.error('No se encontraron sucursales asignadas:', response.data);
+          console.error('No se encontraron sucursales asignadas:', data);
         }
       } else {
-        console.error('Error en la respuesta:', response.data.mensaje);
+        console.error('Error en la respuesta:', data.mensaje);
       }
     } catch (error) {
       console.error('Error al obtener sucursales asignadas:', error);
@@ -152,12 +136,8 @@ export default function MermasContent() {
         return;
       }
 
-      console.log('=== DEBUG: Iniciando fetchRegistrosMermas ===');
-      console.log('Sucursales asignadas:', sucursalesAsignadas);
-
       // Verificar que tenemos sucursales asignadas
       if (sucursalesAsignadas.length === 0) {
-        console.log('No hay sucursales asignadas, no se cargarán mermas');
         setRecords([]);
         setLoadingRecords(false);
         return;
@@ -165,10 +145,8 @@ export default function MermasContent() {
 
       // Construir URL con filtro de sucursales
       const sucursalesIds = sucursalesAsignadas.map(s => s.idCentro).join(',');
-      console.log('IDs de sucursales para consultar:', sucursalesIds);
       
       const url = `${API_URL}/mermas/sucursales/${sucursalesIds}`;
-      console.log('URL a consultar:', url);
       
       // Llamar a la API real de mermas
       const response = await axios.get(url, {
@@ -178,17 +156,9 @@ export default function MermasContent() {
         }
       });
 
-      console.log('Respuesta completa de la API:', response);
-      console.log('Status de respuesta:', response.status);
-      console.log('Data de respuesta:', response.data);
-
       if (response.data.estatus === 1) {
-        console.log('Respuesta de mermas recibida:', response.data);
-        
         // Mapear los datos de la API al formato esperado por el frontend
         const mermasFormateadas = (response.data.mermas || []).map((merma: any) => {
-          console.log('Procesando merma:', merma);
-          
           return {
             idMaMe: merma.idMaMe,
             idCentro: merma.idCentro,
@@ -202,7 +172,6 @@ export default function MermasContent() {
           };
         });
 
-        console.log('Mermas formateadas:', mermasFormateadas);
         setRecords(mermasFormateadas);
       } else {
         console.error('Error en la respuesta de mermas:', response.data.mensaje);
@@ -218,23 +187,19 @@ export default function MermasContent() {
 
   // Función para calcular el total de pérdidas en dinero
   const calcularTotalPerdidas = async () => {
-    console.log('=== INICIANDO CÁLCULO DE PÉRDIDAS ===');
     setLoadingTotalPerdidas(true);
     try {
       const userCredentials = localStorage.getItem('userCredentials');
       if (!userCredentials || records.length === 0) {
-        console.log('No hay credenciales o registros, estableciendo pérdidas en 0');
         setTotalPerdidasDinero(0);
         setLoadingTotalPerdidas(false);
         return;
       }
 
-      console.log(`Calculando pérdidas para ${records.length} mermas`);
       let totalPerdidas = 0;
       
       // Para cada merma, obtener sus productos y calcular el valor
       for (const merma of records) {
-        console.log(`Procesando merma ${merma.idMaMe}`);
         try {
           const response = await axios.get(`${API_URL}/mermas/${merma.idMaMe}/productos`, {
             headers: {
@@ -245,7 +210,6 @@ export default function MermasContent() {
 
           if (response.data.estatus === 1) {
             const productos = response.data.productos || [];
-            console.log(`Merma ${merma.idMaMe} tiene ${productos.length} productos:`, productos);
             
             // Calcular el valor de pérdida para esta merma
             const valorMerma = productos.reduce((suma: number, producto: any) => {
@@ -253,11 +217,9 @@ export default function MermasContent() {
               const cantidad = parseFloat(producto.Cantidad) || 0;
               const precio = parseFloat(producto.Precio || 0);
               const valorProducto = cantidad * precio;
-              console.log(`  Producto ${producto.CodigoBarras}: ${cantidad} x $${precio} = $${valorProducto}`);
               return suma + valorProducto;
             }, 0);
 
-            console.log(`Valor total de merma ${merma.idMaMe}: $${valorMerma}`);
             totalPerdidas += valorMerma;
           }
         } catch (error) {
@@ -265,7 +227,6 @@ export default function MermasContent() {
         }
       }
 
-      console.log(`=== TOTAL CALCULADO: $${totalPerdidas} ===`);
       setTotalPerdidasDinero(totalPerdidas);
     } catch (error) {
       console.error('Error al calcular total de pérdidas:', error);
@@ -277,12 +238,10 @@ export default function MermasContent() {
 
   // Función para calcular pérdidas considerando filtros de fecha
   const calcularTotalPerdidasFiltradas = async () => {
-    console.log('=== INICIANDO CÁLCULO DE PÉRDIDAS FILTRADAS ===');
     setLoadingTotalPerdidas(true);
     try {
       const userCredentials = localStorage.getItem('userCredentials');
       if (!userCredentials) {
-        console.log('No hay credenciales, estableciendo pérdidas en 0');
         setTotalPerdidasDinero(0);
         setLoadingTotalPerdidas(false);
         return;
@@ -292,18 +251,15 @@ export default function MermasContent() {
       const recordsFiltrados = getFilteredRecords();
       
       if (recordsFiltrados.length === 0) {
-        console.log('No hay registros filtrados, estableciendo pérdidas en 0');
         setTotalPerdidasDinero(0);
         setLoadingTotalPerdidas(false);
         return;
       }
 
-      console.log(`Calculando pérdidas para ${recordsFiltrados.length} mermas filtradas`);
       let totalPerdidas = 0;
       
       // Para cada merma filtrada, obtener sus productos y calcular el valor
       for (const merma of recordsFiltrados) {
-        console.log(`Procesando merma filtrada ${merma.idMaMe}`);
         try {
           const response = await axios.get(`${API_URL}/mermas/${merma.idMaMe}/productos`, {
             headers: {
@@ -314,18 +270,15 @@ export default function MermasContent() {
 
           if (response.data.estatus === 1) {
             const productos = response.data.productos || [];
-            console.log(`Merma ${merma.idMaMe} tiene ${productos.length} productos:`, productos);
             
             // Calcular el valor de pérdida para esta merma
             const valorMerma = productos.reduce((suma: number, producto: any) => {
               const cantidad = parseFloat(producto.Cantidad) || 0;
               const precio = parseFloat(producto.Precio || 0);
               const valorProducto = cantidad * precio;
-              console.log(`  Producto ${producto.CodigoBarras}: ${cantidad} x $${precio} = $${valorProducto}`);
               return suma + valorProducto;
             }, 0);
 
-            console.log(`Valor total de merma filtrada ${merma.idMaMe}: $${valorMerma}`);
             totalPerdidas += valorMerma;
           }
         } catch (error) {
@@ -333,7 +286,6 @@ export default function MermasContent() {
         }
       }
 
-      console.log(`=== TOTAL FILTRADO CALCULADO: $${totalPerdidas} ===`);
       setTotalPerdidasDinero(totalPerdidas);
     } catch (error) {
       console.error('Error al calcular total de pérdidas filtradas:', error);
@@ -353,17 +305,20 @@ export default function MermasContent() {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/motivos-merma`, {
-        headers: {
-          'Authorization': `Basic ${userCredentials}`,
-          'Content-Type': 'application/json'
-        }
+      const data = await getCached('motivos_merma', async () => {
+        const res = await axios.get(`${API_URL}/motivos-merma`, {
+          headers: {
+            'Authorization': `Basic ${userCredentials}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        return res.data;
       });
 
-      if (response.data.estatus === 1) {
-        setMotivosMerma(response.data.motivos || []);
+      if (data.estatus === 1) {
+        setMotivosMerma(data.motivos || []);
       } else {
-        console.error('Error al obtener motivos:', response.data.mensaje);
+        console.error('Error al obtener motivos:', data.mensaje);
       }
     } catch (error) {
       console.error('Error al obtener motivos de merma:', error);
@@ -475,6 +430,7 @@ export default function MermasContent() {
       motivoGeneral: '',
       observaciones: ''
     });
+    setNuevaMermaErrors({});
     fetchMotivosMerma();
     setShowNewMermaModal(true);
   };
@@ -493,22 +449,18 @@ export default function MermasContent() {
         return;
       }
 
+      const formErrors: { idCentro?: string; Anfitrion?: string } = {};
       if (!nuevaMerma.idCentro) {
-        alert('Por favor seleccione una sucursal');
-        return;
+        formErrors.idCentro = 'Seleccione una sucursal';
       }
-
       if (!nuevaMerma.Anfitrion) {
-        alert('Por favor seleccione un usuario anfitrión');
+        formErrors.Anfitrion = 'Ingrese el número de nómina del anfitrión';
+      }
+      if (Object.keys(formErrors).length > 0) {
+        setNuevaMermaErrors(formErrors);
         return;
       }
-
-      console.log('Datos a enviar:', {
-        idCentro: nuevaMerma.idCentro,
-        Fecha: new Date().toISOString().split('T')[0], // Fecha automática
-        idUsuario: parseInt(userId),
-        Anfitrion: nuevaMerma.Anfitrion // Número de nómina como string
-      });
+      setNuevaMermaErrors({});
 
       const mermaData = {
         idCentro: nuevaMerma.idCentro,
@@ -523,8 +475,6 @@ export default function MermasContent() {
           'Content-Type': 'application/json'
         }
       });
-
-      console.log('Respuesta del servidor:', response.data);
 
       if (response.data.estatus === 1) {
         // Manejar tanto si devuelve el objeto merma como si solo devuelve el mensaje con ID
@@ -594,8 +544,6 @@ export default function MermasContent() {
       const userCredentials = localStorage.getItem('userCredentials');
       if (!userCredentials || !mermaCreada) return;
 
-      console.log('Guardando productos:', productosSeleccionados);
-
       // Guardar cada producto individualmente CON SU MOTIVO
       for (const producto of productosSeleccionados) {
         const productoData = {
@@ -603,8 +551,6 @@ export default function MermasContent() {
           Cantidad: producto.Cantidad,
           idMotMer: parseInt(producto.idMotMer || nuevaMerma.motivoGeneral || '1') // Usar motivo del producto o motivo general
         };
-
-        console.log('Enviando producto:', productoData);
 
         await axios.post(`${API_URL}/mermas/${mermaCreada.idMaMe}/productos`, productoData, {
           headers: {
@@ -1207,7 +1153,7 @@ export default function MermasContent() {
       {/* Modal para Nueva Merma - 2 Pasos */}
       {showNewMermaModal && (
         <div style={modalOverlay}>
-          <div style={{ ...modalContent, maxWidth: currentStep === 1 ? 560 : 680 }}>
+          <div style={{ ...modalContent, maxWidth: currentStep === 1 ? 560 : 680 }} ref={nuevaMermaModalRef} role="dialog" aria-modal="true" aria-label="Registrar nueva merma" tabIndex={-1}>
 
             {/* Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1245,11 +1191,14 @@ export default function MermasContent() {
               <>
                 <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <label style={labelStyle}>Sucursal *</label>
+                    <label style={labelStyle} htmlFor="merma-sucursal">Sucursal *</label>
                     <select
+                      id="merma-sucursal"
                       value={nuevaMerma.idCentro}
-                      onChange={(e) => setNuevaMerma({...nuevaMerma, idCentro: e.target.value})}
-                      style={inputStyle}
+                      onChange={(e) => { setNuevaMerma({...nuevaMerma, idCentro: e.target.value}); setNuevaMermaErrors(prev => ({ ...prev, idCentro: undefined })); }}
+                      style={{ ...inputStyle, ...(nuevaMermaErrors.idCentro ? { borderColor: '#e53e3e' } : {}) }}
+                      aria-invalid={!!nuevaMermaErrors.idCentro}
+                      aria-describedby={nuevaMermaErrors.idCentro ? 'merma-sucursal-error' : undefined}
                     >
                       <option value="">Seleccione una sucursal</option>
                       {sucursalesAsignadas.map(sucursal => (
@@ -1258,30 +1207,45 @@ export default function MermasContent() {
                         </option>
                       ))}
                     </select>
+                    {nuevaMermaErrors.idCentro && (
+                      <div id="merma-sucursal-error" role="alert" style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>
+                        {nuevaMermaErrors.idCentro}
+                      </div>
+                    )}
                   </div>
 
                   <div>
-                    <label style={labelStyle}>Número de nómina del anfitrión *</label>
+                    <label style={labelStyle} htmlFor="merma-anfitrion">Número de nómina del anfitrión *</label>
                     <input
+                      id="merma-anfitrion"
                       type="text"
                       value={nuevaMerma.Anfitrion}
-                      onChange={(e) => setNuevaMerma({...nuevaMerma, Anfitrion: e.target.value})}
+                      onChange={(e) => { setNuevaMerma({...nuevaMerma, Anfitrion: e.target.value}); setNuevaMermaErrors(prev => ({ ...prev, Anfitrion: undefined })); }}
                       placeholder="Ingrese el número de nómina del anfitrión"
-                      style={inputStyle}
+                      style={{ ...inputStyle, ...(nuevaMermaErrors.Anfitrion ? { borderColor: '#e53e3e' } : {}) }}
+                      aria-invalid={!!nuevaMermaErrors.Anfitrion}
+                      aria-describedby={nuevaMermaErrors.Anfitrion ? 'merma-anfitrion-error' : 'merma-anfitrion-hint'}
                     />
-                    <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>
-                      Número de nómina del empleado responsable de la merma
-                    </div>
+                    {nuevaMermaErrors.Anfitrion ? (
+                      <div id="merma-anfitrion-error" role="alert" style={{ fontSize: 12, color: '#e53e3e', marginTop: 4 }}>
+                        {nuevaMermaErrors.Anfitrion}
+                      </div>
+                    ) : (
+                      <div id="merma-anfitrion-hint" style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>
+                        Número de nómina del empleado responsable de la merma
+                      </div>
+                    )}
                   </div>
 
                   <div>
-                    <label style={labelStyle}>Motivo general (opcional)</label>
+                    <label style={labelStyle} htmlFor="merma-motivo">Motivo general (opcional)</label>
                     {loadingMotivos ? (
                       <div style={{ padding: 12, background: '#f7fafc', borderRadius: 8, textAlign: 'center', color: '#718096', fontSize: 13 }}>
                         Cargando motivos...
                       </div>
                     ) : (
                       <select
+                        id="merma-motivo"
                         value={nuevaMerma.motivoGeneral}
                         onChange={(e) => setNuevaMerma({...nuevaMerma, motivoGeneral: e.target.value})}
                         style={inputStyle}
@@ -1300,8 +1264,9 @@ export default function MermasContent() {
                   </div>
 
                   <div>
-                    <label style={labelStyle}>Observaciones</label>
+                    <label style={labelStyle} htmlFor="merma-observaciones">Observaciones</label>
                     <textarea
+                      id="merma-observaciones"
                       value={nuevaMerma.observaciones}
                       onChange={(e) => setNuevaMerma({...nuevaMerma, observaciones: e.target.value})}
                       placeholder="Descripción adicional de la merma..."
@@ -1346,9 +1311,10 @@ export default function MermasContent() {
 
                   {/* Buscador de productos */}
                   <div>
-                    <label style={labelStyle}>🔍 Buscar producto</label>
+                    <label style={labelStyle} htmlFor="merma-buscar-producto">🔍 Buscar producto</label>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input
+                        id="merma-buscar-producto"
                         type="text"
                         value={searchTerm}
                         onChange={(e) => handleSearchChange(e.target.value)}
@@ -1522,7 +1488,7 @@ export default function MermasContent() {
       {/* Modal de Detalles de Merma */}
       {showDetalleModal && (
         <div style={modalOverlay}>
-          <div style={{ ...modalContent, maxWidth: 800 }}>
+          <div style={{ ...modalContent, maxWidth: 800 }} ref={detalleModalRef} role="dialog" aria-modal="true" aria-label="Detalle de merma" tabIndex={-1}>
 
             {/* Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

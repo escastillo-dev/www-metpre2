@@ -3,7 +3,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { getConReintentos } from '../services/httpRetry';
+import { getCached } from '../services/apiCache';
 import BarcodeScannerModal from './BarcodeScannerModal';
+import { cardStyle, inputStyle, labelStyle, btnPrimary, btnDanger, btnSecondary, modalOverlay, modalContent } from '../styles/sharedStyles';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
@@ -89,41 +92,6 @@ const TIPOS_ACCION = [
 const RESULTADOS_ACCION = ['EN_PROCESO', 'APLICADA', 'NO_APLICA'];
 const RESULTADOS_CIERRE = ['SALIO_EN_VENTA', 'MERMA', 'DEVOLUCION_PROVEEDOR', 'TRANSFERIDO', 'CADUCO_SIN_MOVIMIENTO'];
 
-// --- Estilos inline compartidos (idénticos a MermasContent) ------------------
-
-const cardStyle: React.CSSProperties = {
-  background: '#fff', borderRadius: 12, padding: 24,
-  boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #dee2e6',
-};
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '8px 12px', border: '1px solid #ced4da',
-  borderRadius: 6, fontSize: 14, boxSizing: 'border-box', minHeight: 44,
-};
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 12, fontWeight: 600, color: '#6c757d',
-  marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5,
-};
-const btnPrimary: React.CSSProperties = {
-  background: '#2368b3', color: 'white', border: 'none', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44,
-};
-const btnDanger: React.CSSProperties = {
-  background: '#e53e3e', color: 'white', border: 'none', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44,
-};
-const btnSecondary: React.CSSProperties = {
-  background: '#f8f9fa', color: '#2d3748', border: '1px solid #e2e8f0', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', minHeight: 44,
-};
-const modalOverlay: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-  zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-};
-const modalContent: React.CSSProperties = {
-  background: 'white', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-  width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto',
-};
-
 // --- Componente --------------------------------------------------------------
 
 export default function ProximosCaducarContent() {
@@ -171,6 +139,11 @@ export default function ProximosCaducarContent() {
 
   const [showCierreModal, setShowCierreModal] = useState(false);
   const [cierreForm, setCierreForm] = useState({ resultadoFinal: 'SALIO_EN_VENTA', cantidadSalida: '', cantidadMerma: '', comentario: '' });
+
+  const nuevoModalRef = useFocusTrap<HTMLDivElement>(showNuevoModal, () => setShowNuevoModal(false));
+  const detalleModalRef = useFocusTrap<HTMLDivElement>(showDetalleModal, () => setShowDetalleModal(false));
+  const accionModalRef = useFocusTrap<HTMLDivElement>(showAccionModal, () => setShowAccionModal(false));
+  const cierreModalRef = useFocusTrap<HTMLDivElement>(showCierreModal, () => setShowCierreModal(false));
   const [guardandoCierre, setGuardandoCierre] = useState(false);
   const guardandoNuevoRef = useRef(false);
   const guardandoAccionRef = useRef(false);
@@ -189,8 +162,11 @@ export default function ProximosCaducarContent() {
     try {
       const userId = getUserId();
       if (!userId) return;
-      const res = await getConReintentos(() => axios.get(`${API_URL}/usuarios/${userId}`, { headers: getHeaders() }));
-      if (res.data.estatus === 1 && res.data.sucursales) setSucursalesAsignadas(res.data.sucursales);
+      const data = await getCached(`sucursales_${userId}`, async () => {
+        const res = await getConReintentos(() => axios.get(`${API_URL}/usuarios/${userId}`, { headers: getHeaders() }));
+        return res.data;
+      });
+      if (data.estatus === 1 && data.sucursales) setSucursalesAsignadas(data.sucursales);
     } catch (e) { console.error('Error al obtener sucursales:', e); }
   }, []);
 
@@ -337,7 +313,6 @@ export default function ProximosCaducarContent() {
     setLoadingDetalle(true); setShowDetalleModal(true); setCasoDetalle(null); setAcciones([]);
     try {
       const res = await axios.get(`${API_URL}/caducidad/registros/${idCad}`, { headers: getHeaders() });
-      console.log('[Detalle] respuesta completa:', JSON.stringify(res.data, null, 2));
       // Estructura: res.data.data.registro + res.data.data.acciones + res.data.data.cierre
       const envelope = res.data.data ?? res.data;
       const raw = envelope.registro ?? envelope;
@@ -724,7 +699,7 @@ export default function ProximosCaducarContent() {
       {/* MODAL: Nuevo registro */}
       {showNuevoModal && (
         <div style={modalOverlay}>
-          <div style={modalContent}>
+          <div style={modalContent} ref={nuevoModalRef} role="dialog" aria-modal="true" aria-label="Nuevo caso de caducidad" tabIndex={-1}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, color: '#2368b3', fontSize: 18, fontWeight: 700 }}> Nuevo caso de caducidad</h3>
               <button onClick={() => setShowNuevoModal(false)} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#a0aec0', lineHeight: 1 }}>x</button>
@@ -782,10 +757,11 @@ export default function ProximosCaducarContent() {
                           <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>🔍 Buscando productos...</div>
                         ) : productosSugerencias.length > 0 ? (
                           productosSugerencias.map(p => (
-                            <div
+                            <button
                               key={p.CodigoBarras}
+                              type="button"
                               onClick={() => seleccionarProducto(p)}
-                              style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f7fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                              style={{ display: 'flex', width: '100%', textAlign: 'left', background: 'white', border: 'none', font: 'inherit', padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f7fafc', justifyContent: 'space-between', alignItems: 'center' }}
                               onMouseEnter={e => (e.currentTarget.style.background = '#f0fff4')}
                               onMouseLeave={e => (e.currentTarget.style.background = 'white')}
                             >
@@ -794,7 +770,7 @@ export default function ProximosCaducarContent() {
                                 <div style={{ fontSize: 11, color: '#718096', fontFamily: 'monospace', marginTop: 2 }}>Código: {p.CodigoBarras}</div>
                               </div>
                               <span style={{ background: '#2368b3', color: 'white', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>➕ Seleccionar</span>
-                            </div>
+                            </button>
                           ))
                         ) : searchTermProducto.length >= 2 ? (
                           <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>No se encontraron productos</div>
@@ -811,12 +787,12 @@ export default function ProximosCaducarContent() {
               </div>
               <div>
                 <label style={labelStyle}>Cantidad detectada *</label>
-                <input type="number" min="0.01" step="0.01" placeholder="Ej. 12.5"
+                <input type="number" inputMode="decimal" min="0.01" step="0.01" placeholder="Ej. 12.5"
                   value={nuevoForm.cantidadDetectada} onChange={e => setNuevoForm(f => ({ ...f, cantidadDetectada: e.target.value }))} style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Dias de alerta (1-365)</label>
-                <input type="number" min="1" max="365"
+                <input type="number" inputMode="numeric" min="1" max="365"
                   value={nuevoForm.diasAlerta} onChange={e => setNuevoForm(f => ({ ...f, diasAlerta: e.target.value }))} style={inputStyle} />
               </div>
               <div>
@@ -847,7 +823,7 @@ export default function ProximosCaducarContent() {
       {/* MODAL: Detalle */}
       {showDetalleModal && (
         <div style={modalOverlay}>
-          <div style={{ ...modalContent, maxWidth: 640 }}>
+          <div style={{ ...modalContent, maxWidth: 640 }} ref={detalleModalRef} role="dialog" aria-modal="true" aria-label="Detalle del caso" tabIndex={-1}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, color: '#2368b3', fontSize: 18, fontWeight: 700 }}> Detalle {casoDetalle ? `Caso #${casoDetalle.idCad}` : ''}</h3>
               <button onClick={() => setShowDetalleModal(false)} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#a0aec0', lineHeight: 1 }}>x</button>
@@ -947,7 +923,7 @@ export default function ProximosCaducarContent() {
       {/* MODAL: Accion */}
       {showAccionModal && (
         <div style={{ ...modalOverlay, zIndex: 1060 }}>
-          <div style={{ ...modalContent, maxWidth: 440 }}>
+          <div style={{ ...modalContent, maxWidth: 440 }} ref={accionModalRef} role="dialog" aria-modal="true" aria-label="Registrar acción" tabIndex={-1}>
             <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, color: '#c05621', fontSize: 16, fontWeight: 700 }}>⚡ Registrar acción</h3>
               <button onClick={() => setShowAccionModal(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#a0aec0', lineHeight: 1 }}>x</button>
@@ -967,7 +943,7 @@ export default function ProximosCaducarContent() {
               </div>
               <div>
                 <label style={labelStyle}>Cantidad (opcional)</label>
-                <input type="number" min="0" step="0.01" placeholder="Ej. 5" value={accionForm.cantidad} onChange={e => setAccionForm(f => ({ ...f, cantidad: e.target.value }))} style={inputStyle} />
+                <input type="number" inputMode="decimal" min="0" step="0.01" placeholder="Ej. 5" value={accionForm.cantidad} onChange={e => setAccionForm(f => ({ ...f, cantidad: e.target.value }))} style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Comentario (opcional)</label>
@@ -988,7 +964,7 @@ export default function ProximosCaducarContent() {
       {/* MODAL: Cierre */}
       {showCierreModal && (
         <div style={{ ...modalOverlay, zIndex: 1060 }}>
-          <div style={{ ...modalContent, maxWidth: 440 }}>
+          <div style={{ ...modalContent, maxWidth: 440 }} ref={cierreModalRef} role="dialog" aria-modal="true" aria-label="Cerrar caso" tabIndex={-1}>
             <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, color: '#c53030', fontSize: 16, fontWeight: 700 }}> Cerrar caso</h3>
               <button onClick={() => setShowCierreModal(false)} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#a0aec0', lineHeight: 1 }}>x</button>
@@ -1009,13 +985,13 @@ export default function ProximosCaducarContent() {
               {['SALIO_EN_VENTA', 'TRANSFERIDO', 'DEVOLUCION_PROVEEDOR'].includes(cierreForm.resultadoFinal) && (
                 <div>
                   <label style={labelStyle}>Cantidad de salida (opcional)</label>
-                  <input type="number" min="0" step="0.01" value={cierreForm.cantidadSalida} onChange={e => setCierreForm(f => ({ ...f, cantidadSalida: e.target.value }))} style={inputStyle} />
+                  <input type="number" inputMode="decimal" min="0" step="0.01" value={cierreForm.cantidadSalida} onChange={e => setCierreForm(f => ({ ...f, cantidadSalida: e.target.value }))} style={inputStyle} />
                 </div>
               )}
               {cierreForm.resultadoFinal === 'MERMA' && (
                 <div>
                   <label style={labelStyle}>Cantidad a mermar (opcional)</label>
-                  <input type="number" min="0" step="0.01" placeholder={`Max. ${casoDetalle?.cantidadDetectada}`}
+                  <input type="number" inputMode="decimal" min="0" step="0.01" placeholder={`Max. ${casoDetalle?.cantidadDetectada}`}
                     value={cierreForm.cantidadMerma} onChange={e => setCierreForm(f => ({ ...f, cantidadMerma: e.target.value }))} style={inputStyle} />
                 </div>
               )}

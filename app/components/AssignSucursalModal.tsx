@@ -1,4 +1,5 @@
 import React from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface Sucursal {
   idCentro: string | number;
@@ -39,6 +40,7 @@ interface AssignSucursalModalProps {
 const AssignSucursalModal: React.FC<AssignSucursalModalProps> = ({
   show, user, zonas, sucursales, filteredSucursales, selectedZona, setSelectedZona, selectedSucursal, setSelectedSucursal, onClose, onSubmit, fetchSucursales
 }) => {
+  const containerRef = useFocusTrap<HTMLDivElement>(show, onClose);
   if (!show || !user) return null;
   
   // Determinar qué sucursales mostrar
@@ -52,6 +54,7 @@ const AssignSucursalModal: React.FC<AssignSucursalModalProps> = ({
       <div
         className="modal-content w-full sm:w-[420px] rounded-t-2xl sm:rounded-2xl"
         style={{ backgroundColor: 'white', padding: '24px 20px', boxShadow: '0 -4px 24px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}
+        ref={containerRef} role="dialog" aria-modal="true" aria-label="Asignar sucursal" tabIndex={-1}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 18 }}>Asignar Sucursal</h3>

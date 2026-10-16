@@ -45,6 +45,8 @@ class AuthService extends BaseApiService {
     localStorage.removeItem('userId');
     localStorage.removeItem('userLevel');
     localStorage.removeItem('userName');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('idNivelUsuario');
   }
 
   isAuthenticated(): boolean {

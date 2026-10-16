@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { getConReintentos } from '../services/httpRetry';
+import { getCached } from '../services/apiCache';
 import BarcodeScannerModal from './BarcodeScannerModal';
+import { cardStyle, inputStyle, labelStyle, btnPrimary, btnSecondary } from '../styles/sharedStyles';
 
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
@@ -38,26 +40,6 @@ interface ProductoConsumido {
 
 // --- Estilos compartidos -----------------------------------------------------
 
-const cardStyle: React.CSSProperties = {
-  background: '#fff', borderRadius: 12, padding: 24,
-  boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #dee2e6',
-};
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '8px 12px', border: '1px solid #ced4da',
-  borderRadius: 6, fontSize: 14, boxSizing: 'border-box', minHeight: 44,
-};
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 12, fontWeight: 600, color: '#6c757d',
-  marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5,
-};
-const btnPrimary: React.CSSProperties = {
-  background: '#2368b3', color: 'white', border: 'none', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44,
-};
-const btnSecondary: React.CSSProperties = {
-  background: '#f8f9fa', color: '#2d3748', border: '1px solid #e2e8f0', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', minHeight: 44,
-};
 const tabStyle = (active: boolean): React.CSSProperties => ({
   padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
   border: 'none', borderRadius: '8px 8px 0 0',
@@ -96,11 +78,14 @@ export default function ProductosConsumidosContent() {
     try {
       const userId = getUserId();
       if (!userId) return;
-      const res = await getConReintentos(() => axios.get(`${API_URL}/usuarios/${userId}`, { headers: getHeaders() }));
-      if (res.data.estatus === 1 && res.data.sucursales) {
-        setSucursalesAsignadas(res.data.sucursales);
-        if (res.data.sucursales.length === 1) {
-          setForm(f => ({ ...f, idCentro: res.data.sucursales[0].idCentro }));
+      const data = await getCached(`sucursales_${userId}`, async () => {
+        const res = await getConReintentos(() => axios.get(`${API_URL}/usuarios/${userId}`, { headers: getHeaders() }));
+        return res.data;
+      });
+      if (data.estatus === 1 && data.sucursales) {
+        setSucursalesAsignadas(data.sucursales);
+        if (data.sucursales.length === 1) {
+          setForm(f => ({ ...f, idCentro: data.sucursales[0].idCentro }));
         }
       }
     } catch {
@@ -296,16 +281,17 @@ export default function ProductosConsumidosContent() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={labelStyle}>Sucursal *</label>
-                <select value={form.idCentro} onChange={e => setForm(f => ({ ...f, idCentro: e.target.value }))} style={inputStyle}>
+                <label style={labelStyle} htmlFor="pc-sucursal">Sucursal *</label>
+                <select id="pc-sucursal" value={form.idCentro} onChange={e => setForm(f => ({ ...f, idCentro: e.target.value }))} style={inputStyle}>
                   <option value="">Selecciona una sucursal</option>
                   {sucursalesAsignadas.map(s => <option key={s.idCentro} value={s.idCentro}>{s.Sucursal}</option>)}
                 </select>
               </div>
 
               <div>
-                <label style={labelStyle}>Número de nómina del colaborador *</label>
+                <label style={labelStyle} htmlFor="pc-colaborador">Número de nómina del colaborador *</label>
                 <input
+                  id="pc-colaborador"
                   type="text"
                   inputMode="numeric"
                   value={form.idColaborador}
@@ -319,7 +305,7 @@ export default function ProductosConsumidosContent() {
               </div>
 
               <div style={{ position: 'relative' }}>
-                <label style={labelStyle}>🔍 Producto *</label>
+                <label style={labelStyle} htmlFor="pc-buscar-producto">🔍 Producto *</label>
                 {producto ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid #68d391', background: '#f0fff4', borderRadius: 8, padding: '12px 16px' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -335,6 +321,7 @@ export default function ProductosConsumidosContent() {
                   <>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input
+                        id="pc-buscar-producto"
                         type="text"
                         value={searchTerm}
                         onChange={e => buscarProductos(e.target.value)}
@@ -361,10 +348,11 @@ export default function ProductosConsumidosContent() {
                           <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>🔍 Buscando productos...</div>
                         ) : sugerencias.length > 0 ? (
                           sugerencias.map(p => (
-                            <div
+                            <button
                               key={p.CodigoBarras}
+                              type="button"
                               onClick={() => seleccionarProducto(p)}
-                              style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f7fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                              style={{ display: 'flex', width: '100%', textAlign: 'left', background: 'white', border: 'none', font: 'inherit', padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f7fafc', justifyContent: 'space-between', alignItems: 'center' }}
                               onMouseEnter={e => (e.currentTarget.style.background = '#f0fff4')}
                               onMouseLeave={e => (e.currentTarget.style.background = 'white')}
                             >
@@ -373,7 +361,7 @@ export default function ProductosConsumidosContent() {
                                 <div style={{ fontSize: 11, color: '#718096', fontFamily: 'monospace', marginTop: 2 }}>{p.CodigoBarras}</div>
                               </div>
                               <span style={{ background: '#2368b3', color: 'white', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>➕ Seleccionar</span>
-                            </div>
+                            </button>
                           ))
                         ) : searchTerm.length >= 2 ? (
                           <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>No se encontraron productos</div>
@@ -385,8 +373,9 @@ export default function ProductosConsumidosContent() {
               </div>
 
               <div>
-                <label style={labelStyle}>Cantidad</label>
+                <label style={labelStyle} htmlFor="pc-cantidad">Cantidad</label>
                 <input
+                  id="pc-cantidad"
                   type="number" min="0.01" step="0.01"
                   value={form.Cantidad}
                   onChange={e => setForm(f => ({ ...f, Cantidad: e.target.value }))}
@@ -395,8 +384,9 @@ export default function ProductosConsumidosContent() {
               </div>
 
               <div>
-                <label style={labelStyle}>Comentario (opcional)</label>
+                <label style={labelStyle} htmlFor="pc-comentario">Comentario (opcional)</label>
                 <textarea
+                  id="pc-comentario"
                   rows={2}
                   maxLength={200}
                   value={form.Comentario}
@@ -423,15 +413,16 @@ export default function ProductosConsumidosContent() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ ...cardStyle, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ minWidth: 180 }}>
-              <label style={labelStyle}>Sucursal</label>
-              <select value={filtroCentro} onChange={e => { setOffset(0); setFiltroCentro(e.target.value); }} style={inputStyle}>
+              <label style={labelStyle} htmlFor="pc-filtro-sucursal">Sucursal</label>
+              <select id="pc-filtro-sucursal" value={filtroCentro} onChange={e => { setOffset(0); setFiltroCentro(e.target.value); }} style={inputStyle}>
                 <option value="">Todas</option>
                 {sucursalesAsignadas.map(s => <option key={s.idCentro} value={s.idCentro}>{s.Sucursal}</option>)}
               </select>
             </div>
             <div style={{ minWidth: 160 }}>
-              <label style={labelStyle}>Nómina colaborador</label>
+              <label style={labelStyle} htmlFor="pc-filtro-colaborador">Nómina colaborador</label>
               <input
+                id="pc-filtro-colaborador"
                 type="text" inputMode="numeric"
                 value={filtroColaborador}
                 onChange={e => { setOffset(0); setFiltroColaborador(e.target.value); }}
@@ -440,8 +431,9 @@ export default function ProductosConsumidosContent() {
               />
             </div>
             <div style={{ flex: 1, minWidth: 220 }}>
-              <label style={labelStyle}>Búsqueda libre</label>
+              <label style={labelStyle} htmlFor="pc-busqueda-libre">Búsqueda libre</label>
               <input
+                id="pc-busqueda-libre"
                 type="text"
                 value={qInput}
                 onChange={e => handleQChange(e.target.value)}

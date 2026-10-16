@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface Equipment {
   id: string;
@@ -125,6 +126,15 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
     }
   };
 
+  const getStep1MissingFields = (): string[] => {
+    const missing: string[] = [];
+    if (!formData.sucursal) missing.push('Sucursal');
+    if (!formData.fecha) missing.push('Fecha');
+    if (!formData.horaInicio) missing.push('Hora de Inicio');
+    if (!formData.anfitrion) missing.push('Anfitrión');
+    return missing;
+  };
+
   const handleNext = () => {
     if (guardando) return;
     if (validateCurrentStep() && currentStep < totalSteps) {
@@ -246,11 +256,13 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
   const buttonStack = isMobile ? 'column' : 'row';
   const buttonGap = isMobile ? '8px' : '12px';
 
+  const containerRef = useFocusTrap<HTMLDivElement>(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (
     <div style={modalStyle}>
-      <div style={cardStyle}>
+      <div style={cardStyle} ref={containerRef} role="dialog" aria-modal="true" aria-label={tipo === 'apertura' ? 'Nueva apertura' : 'Nuevo cierre'} tabIndex={-1}>
         {/* Header */}
         <div style={{
           background: tipo === 'apertura' 
@@ -459,10 +471,12 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={formData.anfitrion}
                         onChange={e => setFormData({...formData, anfitrion: e.target.value})}
                         required
-                        placeholder="Nombre del anfitrión"
+                        placeholder="Número de nómina del anfitrión"
                         style={{
                           width: '100%',
                           padding: '12px',
@@ -499,10 +513,11 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                         Candados
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={formData.candados || ''}
                         onChange={e => setFormData({...formData, candados: parseInt(e.target.value) || 0})}
-                        min="0"
                         style={{
                           width: '100%',
                           padding: '12px',
@@ -602,10 +617,12 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={formData.anfitrion}
                         onChange={e => setFormData({...formData, anfitrion: e.target.value})}
                         required
-                        placeholder="Nombre del anfitrión"
+                        placeholder="Número de nómina del anfitrión"
                         style={{
                           width: '100%',
                           padding: '12px',
@@ -640,10 +657,11 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
                         Candados
                       </label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={formData.candados || ''}
                         onChange={e => setFormData({...formData, candados: parseInt(e.target.value) || 0})}
-                        min="0"
                         style={{
                           width: '100%',
                           padding: '12px',
@@ -866,6 +884,23 @@ const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
             </div>
           )}
         </div>
+
+        {currentStep === 1 && !validateCurrentStep() && (
+          <div
+            role="alert"
+            style={{
+              margin: isMobile ? '0 10px 12px' : '0 32px 16px',
+              padding: '10px 14px',
+              background: '#fff5f5',
+              border: '1px solid #feb2b2',
+              borderRadius: '8px',
+              color: '#c53030',
+              fontSize: isMobile ? '13px' : '14px'
+            }}
+          >
+            Completa los campos obligatorios para continuar: {getStep1MissingFields().join(', ')}
+          </div>
+        )}
 
         {/* Footer with buttons */}
         <div style={{ 

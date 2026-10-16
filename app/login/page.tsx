@@ -1,19 +1,66 @@
 'use client';
 import "../style.css";
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+const MAX_INTENTOS = 5;
+const BLOQUEO_MS = 60_000; // 1 minuto
+const STORAGE_INTENTOS = 'loginIntentosFallidos';
+const STORAGE_BLOQUEO = 'loginBloqueadoHasta';
+
+function LoginForm() {
+  const searchParams = useSearchParams();
   const [nomina, setNomina] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [segundosRestantes, setSegundosRestantes] = useState(0);
+
+  useEffect(() => {
+    if (searchParams.get('expired') === '1') {
+      setError('Tu sesión ha expirado o ya no es válida. Inicia sesión nuevamente.');
+    }
+  }, [searchParams]);
+
+  // Cuenta regresiva del bloqueo temporal por intentos fallidos
+  useEffect(() => {
+    const actualizarBloqueo = () => {
+      const hasta = parseInt(localStorage.getItem(STORAGE_BLOQUEO) || '0', 10);
+      const restante = Math.max(0, Math.ceil((hasta - Date.now()) / 1000));
+      setSegundosRestantes(restante);
+      if (restante === 0 && hasta !== 0) {
+        localStorage.removeItem(STORAGE_BLOQUEO);
+        localStorage.removeItem(STORAGE_INTENTOS);
+      }
+    };
+    actualizarBloqueo();
+    const interval = setInterval(actualizarBloqueo, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // NEXT_PUBLIC_API_URL en .env.local controla la URL — vacío = usa proxy /backend
   const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
+  const registrarIntentoFallido = () => {
+    const intentos = parseInt(localStorage.getItem(STORAGE_INTENTOS) || '0', 10) + 1;
+    if (intentos >= MAX_INTENTOS) {
+      const hasta = Date.now() + BLOQUEO_MS;
+      localStorage.setItem(STORAGE_BLOQUEO, hasta.toString());
+      localStorage.setItem(STORAGE_INTENTOS, '0');
+      setSegundosRestantes(Math.ceil(BLOQUEO_MS / 1000));
+    } else {
+      localStorage.setItem(STORAGE_INTENTOS, intentos.toString());
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (segundosRestantes > 0) {
+      setError(`Demasiados intentos fallidos. Intenta de nuevo en ${segundosRestantes}s.`);
+      return;
+    }
 
     if (!nomina || isNaN(parseInt(nomina))) {
       setError("El número de nómina debe ser un número válido.");
@@ -36,14 +83,20 @@ export default function LoginPage() {
       const responseData = await response.json();
 
       if (!response.ok) {
+        registrarIntentoFallido();
         setError(responseData?.mensaje || `Error ${response.status}. Verifica tus credenciales.`);
         return;
       }
 
       if (responseData.estatus !== 1) {
+        registrarIntentoFallido();
         setError(responseData.mensaje || "Credenciales incorrectas. Inténtalo de nuevo.");
         return;
       }
+
+      // Login exitoso: limpiar contador de intentos fallidos
+      localStorage.removeItem(STORAGE_INTENTOS);
+      localStorage.removeItem(STORAGE_BLOQUEO);
 
       // 2. Login exitoso — obtener nivel de usuario
       const credentials = btoa(`${nomina}:${password}`);
@@ -105,11 +158,14 @@ export default function LoginPage() {
             <label className="input-label" htmlFor="nomina">Número de Nómina</label>
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               id="nomina"
               value={nomina}
               onChange={(e) => setNomina(e.target.value)}
               className="input-field"
               placeholder="Ingresa tu número de nómina"
+              disabled={segundosRestantes > 0}
               required
             />
           </div>
@@ -123,15 +179,26 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="input-field"
               placeholder="Ingresa tu contraseña"
+              disabled={segundosRestantes > 0}
               required
             />
           </div>
 
-          <button type="submit" className="submit-button" disabled={loading}>
-            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+          <button type="submit" className="submit-button" disabled={loading || segundosRestantes > 0}>
+            {segundosRestantes > 0
+              ? `Bloqueado (${segundosRestantes}s)`
+              : loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

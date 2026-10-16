@@ -95,7 +95,7 @@ const UserTable: React.FC<UserTableProps> = ({ users, onEdit, onAssign, onDelete
   return (
     <>
       {/* --- Vista de escritorio: tabla completa (oculta en móvil) --- */}
-      <div className="hidden md:block">
+      <div className="hidden md:block" style={{ overflowX: 'auto' }}>
         <table className="data-table">
           <thead>
             <tr>

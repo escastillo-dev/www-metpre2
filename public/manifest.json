@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "WWW MetPre - Sistema de Gestión",
   "short_name": "MetPre",
   "description": "Sistema de gestión de mermas, valores y operaciones para sucursales",
@@ -21,18 +22,46 @@
       "purpose": "any maskable"
     }
   ],
+  "shortcuts": [
+    {
+      "name": "Valores",
+      "short_name": "Valores",
+      "description": "Registrar y consultar movimientos de valores",
+      "url": "/valores"
+    },
+    {
+      "name": "Mermas",
+      "short_name": "Mermas",
+      "description": "Registrar y consultar mermas",
+      "url": "/mermas"
+    },
+    {
+      "name": "Apertura/Cierre",
+      "short_name": "Apertura/Cierre",
+      "description": "Registrar apertura o cierre de sucursal",
+      "url": "/apertura-cierres"
+    },
+    {
+      "name": "Próximos a Caducar",
+      "short_name": "Caducidad",
+      "description": "Gestionar productos próximos a caducar",
+      "url": "/proximoscaducar"
+    }
+  ],
   "screenshots": [
     {
       "src": "/screenshot-mobile.png",
       "sizes": "540x720",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Resumen del dashboard en vista móvil"
     },
     {
       "src": "/screenshot-desktop.png",
       "sizes": "1920x1080",
       "type": "image/png",
-      "form_factor": "wide"
+      "form_factor": "wide",
+      "label": "Resumen del dashboard en vista de escritorio"
     }
   ],
   "categories": ["business", "productivity", "utilities"],

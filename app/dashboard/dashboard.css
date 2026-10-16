@@ -187,6 +187,21 @@ body {
     border-left-color: #f5942b;
 }
 
+/* "Cerrar Sesión" se separa visualmente del resto de opciones de navegación
+   para evitar que se confunda con un módulo más y reducir cierres de sesión
+   accidentales al navegar rápido con el pulgar. */
+.nav-item-logout {
+    margin-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffb4a8;
+}
+
+.nav-item-logout:hover {
+    background: rgba(229, 62, 62, 0.15);
+    color: #fff;
+    border-left-color: #e53e3e;
+}
+
 .main-content {
     flex: 1;
     display: flex;
@@ -197,6 +212,9 @@ body {
 .top-bar {
     background: white;
     padding: 20px 30px;
+    padding-top: calc(20px + env(safe-area-inset-top));
+    padding-left: calc(30px + env(safe-area-inset-left));
+    padding-right: calc(30px + env(safe-area-inset-right));
     border-bottom: 1px solid #e2e8f0;
     display: flex;
     justify-content: space-between;
@@ -382,8 +400,8 @@ select:focus {
 .mobile-menu-toggle {
     display: none;
     position: fixed;
-    top: 20px;
-    left: 20px;
+    top: calc(20px + env(safe-area-inset-top));
+    left: calc(20px + env(safe-area-inset-left));
     z-index: 1001;
     background: #2368b3;
     border: none;
@@ -436,6 +454,9 @@ select:focus {
         z-index: 1000;
         transition: left 0.3s ease;
         overflow-y: auto;
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
     }
 
     .sidebar.open {
@@ -504,11 +525,13 @@ select:focus {
     /* Main content ocupa todo el ancho en móvil */
     .main-content {
         width: 100%;
-        margin-top: 70px; /* Espacio para el botón hamburguesa */
+        margin-top: calc(70px + env(safe-area-inset-top)); /* Espacio para el botón hamburguesa + notch/isla dinámica */
     }
 
     .top-bar {
         padding: 15px 20px;
+        padding-left: calc(20px + env(safe-area-inset-left));
+        padding-right: calc(20px + env(safe-area-inset-right));
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;

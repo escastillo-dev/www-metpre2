@@ -3,7 +3,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { getConReintentos } from '../services/httpRetry';
+import { getCached } from '../services/apiCache';
 import BarcodeScannerModal from './BarcodeScannerModal';
+import { cardStyle, inputStyle, labelStyle, btnPrimary, btnSecondary, modalOverlay, modalContent as modalContentBase } from '../styles/sharedStyles';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
@@ -48,34 +51,8 @@ interface Stats {
 
 // --- Estilos compartidos -----------------------------------------------------
 
-const cardStyle: React.CSSProperties = {
-  background: '#fff', borderRadius: 12, padding: 24,
-  boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '1px solid #dee2e6',
-};
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '8px 12px', border: '1px solid #ced4da',
-  borderRadius: 6, fontSize: 14, boxSizing: 'border-box', minHeight: 44,
-};
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 12, fontWeight: 600, color: '#6c757d',
-  marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5,
-};
-const btnPrimary: React.CSSProperties = {
-  background: '#2368b3', color: 'white', border: 'none', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44,
-};
-const btnSecondary: React.CSSProperties = {
-  background: '#f8f9fa', color: '#2d3748', border: '1px solid #e2e8f0', borderRadius: 8,
-  padding: '10px 20px', fontSize: 14, fontWeight: 500, cursor: 'pointer', minHeight: 44,
-};
-const modalOverlay: React.CSSProperties = {
-  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
-  zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-};
-const modalContent: React.CSSProperties = {
-  background: 'white', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-  width: '100%', maxWidth: 620, maxHeight: '92vh', overflowY: 'auto',
-};
+// Este modal es ligeramente más ancho que el resto (más campos por fila).
+const modalContent: React.CSSProperties = { ...modalContentBase, maxWidth: 620, maxHeight: '92vh' };
 
 const formatMXN = (v: number) =>
   v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
@@ -99,6 +76,7 @@ export default function RecuperacionesContent() {
   const [showModal, setShowModal] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const guardandoRef = useRef(false);
+  const modalRef = useFocusTrap<HTMLDivElement>(showModal, () => setShowModal(false));
 
   // Catálogos
   const [tipos, setTipos] = useState<TipoRecuperacion[]>([]);
@@ -154,11 +132,14 @@ export default function RecuperacionesContent() {
     try {
       const userId = getUserId();
       if (!userId) return;
-      const res = await getConReintentos(() => axios.get(`${API_URL}/usuarios/${userId}`, { headers: getHeaders() }));
-      if (res.data.estatus === 1 && res.data.sucursales) {
-        setSucursalesAsignadas(res.data.sucursales);
-        if (res.data.sucursales.length === 1) {
-          setForm(f => ({ ...f, idCentro: res.data.sucursales[0].idCentro }));
+      const data = await getCached(`sucursales_${userId}`, async () => {
+        const res = await getConReintentos(() => axios.get(`${API_URL}/usuarios/${userId}`, { headers: getHeaders() }));
+        return res.data;
+      });
+      if (data.estatus === 1 && data.sucursales) {
+        setSucursalesAsignadas(data.sucursales);
+        if (data.sucursales.length === 1) {
+          setForm(f => ({ ...f, idCentro: data.sucursales[0].idCentro }));
         }
       }
     } catch { /* ignorar */ }
@@ -176,10 +157,11 @@ export default function RecuperacionesContent() {
     setFilas([crearFila()]);
     setForm(f => ({ ...f, idTipoRecuperacion: '', idProveedor: '', nombreInfractor: '', comentario: '' }));
     try {
-      const [tiposRes] = await Promise.all([
-        axios.get(`${API_URL}/catalogos/tipos-recuperacion`, { headers: getHeaders() }),
-      ]);
-      if (tiposRes.data.estatus === 1) setTipos(tiposRes.data.tipos || tiposRes.data.data || []);
+      const data = await getCached('tipos_recuperacion', async () => {
+        const res = await axios.get(`${API_URL}/catalogos/tipos-recuperacion`, { headers: getHeaders() });
+        return res.data;
+      });
+      if (data.estatus === 1) setTipos(data.tipos || data.data || []);
     } catch { /* ignorar */ }
   };
 
@@ -372,7 +354,8 @@ export default function RecuperacionesContent() {
             {stats.porZona?.length > 0 && (
               <div style={cardStyle}>
                 <h4 style={{ margin: '0 0 12px 0', color: '#2d3748', fontSize: 15, fontWeight: 600 }}>🗺️ Por zona</h4>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 320 }}>
                   <thead>
                     <tr style={{ background: '#f7fafc' }}>
                       {['Zona', 'Eventos', 'Importe'].map(h => (
@@ -390,6 +373,7 @@ export default function RecuperacionesContent() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
@@ -397,7 +381,8 @@ export default function RecuperacionesContent() {
             {stats.porProveedor?.length > 0 && (
               <div style={cardStyle}>
                 <h4 style={{ margin: '0 0 12px 0', color: '#2d3748', fontSize: 15, fontWeight: 600 }}>🏢 Top proveedores</h4>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 320 }}>
                   <thead>
                     <tr style={{ background: '#f7fafc' }}>
                       {['Proveedor', 'Eventos', 'Importe'].map(h => (
@@ -415,6 +400,7 @@ export default function RecuperacionesContent() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
           </div>
@@ -509,7 +495,7 @@ export default function RecuperacionesContent() {
       {/* ── MODAL: Nueva recuperación ─────────────────────────────────── */}
       {showModal && (
         <div style={modalOverlay}>
-          <div style={modalContent}>
+          <div style={modalContent} ref={modalRef} role="dialog" aria-modal="true" aria-label="Nueva recuperación" tabIndex={-1}>
             {/* Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, color: '#2368b3', fontSize: 18, fontWeight: 700 }}>🔄 Nueva Recuperación</h3>
@@ -631,13 +617,13 @@ export default function RecuperacionesContent() {
                                     <div style={{ padding: 12, color: '#718096', fontSize: 13 }}>🔍 Buscando...</div>
                                   ) : fila.sugerencias.length > 0 ? (
                                     fila.sugerencias.map(p => (
-                                      <div key={p.CodigoBarras} onClick={() => seleccionarProducto(fila.id, p)}
-                                        style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f7fafc' }}
+                                      <button key={p.CodigoBarras} type="button" onClick={() => seleccionarProducto(fila.id, p)}
+                                        style={{ display: 'block', width: '100%', textAlign: 'left', background: 'white', border: 'none', borderBottom: '1px solid #f7fafc', padding: '8px 12px', cursor: 'pointer', font: 'inherit' }}
                                         onMouseEnter={e => (e.currentTarget.style.background = '#f0fff4')}
                                         onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
                                         <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 13 }}>{p.Producto || p.Descripcion}</div>
                                         <div style={{ fontSize: 11, color: '#718096', fontFamily: 'monospace' }}>{p.CodigoBarras}</div>
-                                      </div>
+                                      </button>
                                     ))
                                   ) : fila.searchTerm.length >= 2 ? (
                                     <div style={{ padding: 12, color: '#718096', fontSize: 13 }}>Sin resultados</div>
@@ -651,7 +637,7 @@ export default function RecuperacionesContent() {
                         <div style={{ width: 90 }}>
                           <label style={{ ...labelStyle, fontSize: 11 }}>Cantidad</label>
                           <input
-                            type="number" min="0.01" step="0.01"
+                            type="number" inputMode="decimal" min="0.01" step="0.01"
                             value={fila.cantidad}
                             onChange={e => setFilas(prev => prev.map(f => f.id === fila.id ? { ...f, cantidad: e.target.value } : f))}
                             style={{ ...inputStyle, textAlign: 'center' }}

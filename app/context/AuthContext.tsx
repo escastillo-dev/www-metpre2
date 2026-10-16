@@ -2,6 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import axios from 'axios';
 import AuthService, { UserData, Sucursal } from '../services/AuthService';
 
 // Tipos del estado
@@ -72,6 +73,25 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(authReducer, initialState);
+
+  // Interceptor global: si cualquier petición axios responde 401 (credenciales
+  // inválidas o sesión invalidada en el servidor), cerramos la sesión local y
+  // redirigimos a login con un mensaje, en vez de dejar al usuario con peticiones
+  // fallando en silencio.
+  useEffect(() => {
+    const interceptorId = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error?.response?.status === 401 && window.location.pathname !== '/login') {
+          AuthService.logout();
+          dispatch({ type: 'LOGOUT' });
+          window.location.href = '/login?expired=1';
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptorId);
+  }, []);
 
   // Verificar autenticación al cargar
   useEffect(() => {

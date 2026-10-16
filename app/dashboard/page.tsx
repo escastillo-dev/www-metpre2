@@ -2,18 +2,24 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import axios from 'axios';
+import { getCached } from '../services/apiCache';
 import './dashboard.css';
-import DashboardOverview from '../components/DashboardOverview';
 import AssignSucursalModal from '../components/AssignSucursalModal';
 import EditUserModal from '../components/EditUserModal';
 import UserTable from '../components/UserTable';
-import ValoresContent from '../components/ValoresContent';
-import AperturaCierresContent from '../components/AperturaCierresContent';
-import MermasContent from '../components/MermasContent';
-import ProximosCaducarContent from '../components/ProximosCaducarContent';
-import RecuperacionesContent from '../components/RecuperacionesContent';
-import ProductosConsumidosContent from '../components/ProductosConsumidosContent';
+
+// Cada panel se descarga solo la primera vez que el usuario lo visita (no en la carga
+// inicial del dashboard), lo que reduce el JS que se transfiere en la primera visita
+// desde el celular.
+const DashboardOverview = dynamic(() => import('../components/DashboardOverview'), { ssr: false });
+const ValoresContent = dynamic(() => import('../components/ValoresContent'), { ssr: false });
+const AperturaCierresContent = dynamic(() => import('../components/AperturaCierresContent'), { ssr: false });
+const MermasContent = dynamic(() => import('../components/MermasContent'), { ssr: false });
+const ProximosCaducarContent = dynamic(() => import('../components/ProximosCaducarContent'), { ssr: false });
+const RecuperacionesContent = dynamic(() => import('../components/RecuperacionesContent'), { ssr: false });
+const ProductosConsumidosContent = dynamic(() => import('../components/ProductosConsumidosContent'), { ssr: false });
 
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
@@ -81,9 +87,13 @@ function DashboardContent() {
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
+    if (!token) {
+      router.replace('/login');
+      return;
+    }
     const level = localStorage.getItem('userLevel');
     const name = localStorage.getItem('userName');
-    setIsAuthenticated(!!token);
+    setIsAuthenticated(true);
     setUserLevel(level || '');
     setUserName(name || '');
     
@@ -108,7 +118,6 @@ function DashboardContent() {
         setActivePanel('dashboard');
       }
     } catch (error) {
-      console.log('Error reading search params:', error);
       setActivePanel('dashboard');
     }
   }, [searchParams]);
@@ -126,7 +135,6 @@ function DashboardContent() {
   // Efecto específico para cargar zonas cuando se abre el modal de asignación
   useEffect(() => {
     if (assigningUser) {
-      console.log('Modal abierto para usuario:', assigningUser);
       fetchZonas();
       // Reset estados del modal de forma más agresiva
       setSelectedZona("Todas las zonas");
@@ -163,13 +171,16 @@ function DashboardContent() {
 
   const fetchUserLevels = async () => {
     try {
-      const response = await axios.get(`${API_URL}/niveles-usuario`, {
-        headers: {
-          'Authorization': `Basic ${localStorage.getItem('userCredentials')}`,
-        },
+      const data = await getCached('niveles_usuario', async () => {
+        const response = await axios.get(`${API_URL}/niveles-usuario`, {
+          headers: {
+            'Authorization': `Basic ${localStorage.getItem('userCredentials')}`,
+          },
+        });
+        return response.data;
       });
-      if (response.data && response.data.niveles) {
-        setUserLevels(response.data.niveles);
+      if (data && data.niveles) {
+        setUserLevels(data.niveles);
       }
     } catch (error) {
       console.error('Error fetching user levels:', error);
@@ -204,10 +215,6 @@ function DashboardContent() {
 
   const fetchSucursales = async (zonaId: number) => {
     try {
-      console.log('=== INICIO fetchSucursales ===');
-      console.log('ZonaId recibido:', zonaId);
-      console.log('Usuario asignado:', assigningUser);
-
       if (!assigningUser) {
         console.error('No hay usuario seleccionado');
         return;
@@ -227,18 +234,12 @@ function DashboardContent() {
         url += `?idZona=${zonaId}`;
       }
 
-      console.log('URL construida:', url);
-
       const response = await axios.get(url, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
         }
       });
-
-      console.log('Response completo:', response);
-      console.log('Response data:', response.data);
-      console.log('Response status:', response.status);
 
       // Verificar diferentes formatos posibles de respuesta
       let sucursalesData = [];
@@ -247,34 +248,19 @@ function DashboardContent() {
         if (Array.isArray(response.data)) {
           // Si la respuesta es directamente un array
           sucursalesData = response.data;
-          console.log('Formato: Array directo');
         } else if (response.data.sucursales && Array.isArray(response.data.sucursales)) {
           // Si tiene la propiedad sucursales
           sucursalesData = response.data.sucursales;
-          console.log('Formato: Objeto con propiedad sucursales');
         } else if (response.data.data && Array.isArray(response.data.data)) {
           // Si tiene la propiedad data
           sucursalesData = response.data.data;
-          console.log('Formato: Objeto con propiedad data');
         } else {
           console.error('Formato de respuesta no reconocido:', response.data);
         }
       }
 
-      console.log('Sucursales procesadas:', sucursalesData);
-      console.log('Cantidad de sucursales:', sucursalesData.length);
-
-      if (sucursalesData.length > 0) {
-        // Mostrar estructura del primer elemento para debug
-        console.log('Estructura del primer elemento:', sucursalesData[0]);
-        console.log('Propiedades disponibles:', Object.keys(sucursalesData[0]));
-      }
-
       setSucursales(sucursalesData);
       setFilteredSucursales(sucursalesData);
-      
-      console.log('Estados actualizados con', sucursalesData.length, 'sucursales');
-      console.log('=== FIN fetchSucursales ===');
 
     } catch (error) {
       console.error('=== ERROR en fetchSucursales ===');
@@ -338,16 +324,19 @@ function DashboardContent() {
 
   const handleEditClick = async (user: User) => {
     try {
-      const response = await axios.get(`${API_URL}/niveles-usuario`, {
-        headers: {
-          'Authorization': `Basic ${localStorage.getItem('userCredentials')}`,
-        },
+      const data = await getCached('niveles_usuario', async () => {
+        const response = await axios.get(`${API_URL}/niveles-usuario`, {
+          headers: {
+            'Authorization': `Basic ${localStorage.getItem('userCredentials')}`,
+          },
+        });
+        return response.data;
       });
-      
-      if (response.data && response.data.niveles) {
-        setUserLevels(response.data.niveles);
+
+      if (data && data.niveles) {
+        setUserLevels(data.niveles);
       }
-      
+
       setEditingUser(user);
       setEditForm({
         NombreUsuario: user.NombreUsuario,
@@ -490,9 +479,15 @@ function DashboardContent() {
             </div>
 
             <div
-              className="nav-item"
+              className="nav-item nav-item-logout"
               onClick={() => {
+                if (!window.confirm('¿Seguro que deseas cerrar sesión?')) return;
                 localStorage.removeItem('authToken');
+                localStorage.removeItem('userCredentials');
+                localStorage.removeItem('userId');
+                localStorage.removeItem('userName');
+                localStorage.removeItem('userLevel');
+                localStorage.removeItem('idNivelUsuario');
                 router.replace('/login');
               }}
             >
@@ -547,7 +542,7 @@ function DashboardContent() {
                 }}
                 onDelete={(user) => {
                   if (confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
-                    console.log(`Usuario ${user.idUsuarios} eliminado`);
+                    // TODO: no existe endpoint de eliminación en el backend todavía.
                   }
                 }}
               />
