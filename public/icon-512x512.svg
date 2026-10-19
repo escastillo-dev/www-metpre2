@@ -1,0 +1,13 @@
+<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#2368b3"/>
+  
+  <!-- Icon Design -->
+  <circle cx="256" cy="256" r="180" fill="#ffffff" opacity="0.2"/>
+  
+  <!-- Letters -->
+  <text x="256" y="295" font-family="Arial, sans-serif" font-size="170" font-weight="bold" fill="#ffffff" text-anchor="middle">M</text>
+  
+  <!-- Subtitle -->
+  <text x="256" y="410" font-family="Arial, sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" opacity="0.9">MetPre</text>
+</svg>

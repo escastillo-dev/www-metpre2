@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Iconos PWA</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2368b3;
+            text-align: center;
+        }
+        .canvas-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        .download-btn {
+            display: block;
+            margin: 10px auto;
+            padding: 10px 20px;
+            background: #2368b3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .download-btn:hover {
+            background: #1a5491;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        .instructions ol {
+            margin: 10px 0;
+        }
+        .instructions li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Generador de Iconos PWA - WWW MetPre</h1>
+        
+        <div class="canvas-container">
+            <div>
+                <canvas id="icon192" width="192" height="192"></canvas>
+                <button class="download-btn" onclick="downloadIcon('icon192', 'icon-192x192.png')">
+                    📥 Descargar 192x192
+                </button>
+            </div>
+            <div>
+                <canvas id="icon512" width="512" height="512"></canvas>
+                <button class="download-btn" onclick="downloadIcon('icon512', 'icon-512x512.png')">
+                    📥 Descargar 512x512
+                </button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Instrucciones de Uso</h3>
+            <ol>
+                <li>Haz clic en los botones "Descargar" para obtener cada icono</li>
+                <li>Guarda los archivos en la carpeta <code>public/</code> de tu proyecto</li>
+                <li>Los nombres deben ser exactamente: <code>icon-192x192.png</code> y <code>icon-512x512.png</code></li>
+                <li>¡Listo! Tu PWA tendrá los iconos configurados</li>
+            </ol>
+            
+            <h3>🎨 Personalización (Opcional)</h3>
+            <p>Para crear iconos personalizados con tu logo:</p>
+            <ul>
+                <li><strong>Opción 1:</strong> Usa <a href="https://realfavicongenerator.net/" target="_blank">RealFaviconGenerator</a></li>
+                <li><strong>Opción 2:</strong> Usa <a href="https://www.pwabuilder.com/imageGenerator" target="_blank">PWA Builder</a></li>
+                <li><strong>Opción 3:</strong> Usa <a href="https://favicon.io/" target="_blank">Favicon.io</a></li>
+            </ul>
+            <p>Sube tu logo y descarga los iconos en los tamaños requeridos (192x192 y 512x512).</p>
+        </div>
+    </div>
+
+    <script>
+        function drawIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // Fondo azul
+            ctx.fillStyle = '#2368b3';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Círculo decorativo
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Letra M
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${size/3}px Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('M', size/2, size/2 + size/16);
+            
+            // Texto MetPre
+            ctx.globalAlpha = 0.9;
+            ctx.font = `${size/11}px Arial, sans-serif`;
+            ctx.fillText('MetPre', size/2, size - size/6);
+        }
+
+        function downloadIcon(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // Dibujar iconos al cargar la página
+        window.onload = function() {
+            drawIcon('icon192', 192);
+            drawIcon('icon512', 512);
+        };
+    </script>
+</body>
+</html>

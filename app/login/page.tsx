@@ -1,62 +1,140 @@
-"use client";
+'use client';
 import "../style.css";
-import { useState } from "react";
-import axios from "axios";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
-  const [nomina, setNomina] = useState(""); // Número de nómina
-  const [password, setPassword] = useState(""); // Contraseña
-  const [error, setError] = useState(""); // Mensaje de error
+const MAX_INTENTOS = 5;
+const BLOQUEO_MS = 60_000; // 1 minuto
+const STORAGE_INTENTOS = 'loginIntentosFallidos';
+const STORAGE_BLOQUEO = 'loginBloqueadoHasta';
+
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const [nomina, setNomina] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [segundosRestantes, setSegundosRestantes] = useState(0);
+
+  useEffect(() => {
+    if (searchParams.get('expired') === '1') {
+      setError('Tu sesión ha expirado o ya no es válida. Inicia sesión nuevamente.');
+    }
+  }, [searchParams]);
+
+  // Cuenta regresiva del bloqueo temporal por intentos fallidos
+  useEffect(() => {
+    const actualizarBloqueo = () => {
+      const hasta = parseInt(localStorage.getItem(STORAGE_BLOQUEO) || '0', 10);
+      const restante = Math.max(0, Math.ceil((hasta - Date.now()) / 1000));
+      setSegundosRestantes(restante);
+      if (restante === 0 && hasta !== 0) {
+        localStorage.removeItem(STORAGE_BLOQUEO);
+        localStorage.removeItem(STORAGE_INTENTOS);
+      }
+    };
+    actualizarBloqueo();
+    const interval = setInterval(actualizarBloqueo, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // NEXT_PUBLIC_API_URL en .env.local controla la URL — vacío = usa proxy /backend
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
+
+  const registrarIntentoFallido = () => {
+    const intentos = parseInt(localStorage.getItem(STORAGE_INTENTOS) || '0', 10) + 1;
+    if (intentos >= MAX_INTENTOS) {
+      const hasta = Date.now() + BLOQUEO_MS;
+      localStorage.setItem(STORAGE_BLOQUEO, hasta.toString());
+      localStorage.setItem(STORAGE_INTENTOS, '0');
+      setSegundosRestantes(Math.ceil(BLOQUEO_MS / 1000));
+    } else {
+      localStorage.setItem(STORAGE_INTENTOS, intentos.toString());
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(""); // Limpiar errores previos
+    setError("");
 
-    // Validaciones de entrada
+    if (segundosRestantes > 0) {
+      setError(`Demasiados intentos fallidos. Intenta de nuevo en ${segundosRestantes}s.`);
+      return;
+    }
+
     if (!nomina || isNaN(parseInt(nomina))) {
       setError("El número de nómina debe ser un número válido.");
       return;
     }
-
     if (!password || password.trim() === "") {
       setError("La contraseña no puede estar vacía.");
       return;
     }
 
+    setLoading(true);
     try {
-      // Enviar solicitud a la API
-      const response = await axios.post(
-        "http://127.0.0.1:8000/usuarios/autenticar",
-        {
-          idUsuarios: parseInt(nomina), // Convertimos la nómina a número
-          pwd: password, // Contraseña
-        },
-        {
-          headers: {
-            "Content-Type": "application/json", // Encabezado para JSON
-          },
-        }
-      );
+      // 1. Autenticar usuario
+      const response = await fetch(`${API_URL}/usuarios/autenticar`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idUsuarios: parseInt(nomina), pwd: password }),
+      });
 
-      console.log("Respuesta de la API:", response.data);
+      const responseData = await response.json();
 
-      // Manejo de respuesta exitosa
-      if (response.data.estatus === 1) {
-        const token = response.data.token;
-        const userName = response.data.usuario.nombre; // Extract the user's name
-        localStorage.setItem("authToken", token); // Save the token
-        localStorage.setItem("userName", userName); // Save the user's name
-        console.log("Login exitoso:", response.data);
-        alert("Login exitoso");
-        window.location.href = "/dashboard"; // Redirigir al dashboard
-      } else {
-        // Manejo de respuesta con credenciales inválidas
-        setError(response.data.mensaje || "Credenciales incorrectas. Inténtalo de nuevo.");
+      if (!response.ok) {
+        registrarIntentoFallido();
+        setError(responseData?.mensaje || `Error ${response.status}. Verifica tus credenciales.`);
+        return;
       }
+
+      if (responseData.estatus !== 1) {
+        registrarIntentoFallido();
+        setError(responseData.mensaje || "Credenciales incorrectas. Inténtalo de nuevo.");
+        return;
+      }
+
+      // Login exitoso: limpiar contador de intentos fallidos
+      localStorage.removeItem(STORAGE_INTENTOS);
+      localStorage.removeItem(STORAGE_BLOQUEO);
+
+      // 2. Login exitoso — obtener nivel de usuario
+      const credentials = btoa(`${nomina}:${password}`);
+      const userName      = responseData.usuario.nombre;
+      const idNivelUsuario = responseData.usuario.idNivelUsuario;
+      const token         = responseData.token;
+
+      const nivelResponse = await fetch(`${API_URL}/niveles-usuario`, {
+        headers: { 'Authorization': `Basic ${credentials}` },
+      });
+
+      const nivelData = await nivelResponse.json();
+      const nivelInfo = nivelData.niveles?.find(
+        (n: { idNivelUsuario: number; NivelUsuario: string }) =>
+          n.idNivelUsuario === idNivelUsuario
+      );
+      const nivelUsuario = nivelInfo ? nivelInfo.NivelUsuario : 'Usuario';
+
+      // 3. Guardar sesión
+      localStorage.setItem("userCredentials", credentials);
+      localStorage.setItem("userName",        userName);
+      localStorage.setItem("idNivelUsuario",  idNivelUsuario.toString());
+      localStorage.setItem("userLevel",       nivelUsuario);
+      localStorage.setItem("authToken",       token);
+      localStorage.setItem("userId",          nomina);
+
+      window.location.href = "/dashboard";
+
     } catch (err: any) {
-      console.error("Error en el login:", err);
-      console.log("Detalles del error:", err.response?.data || err.message || err);
-      setError("Ocurrió un error de red. Inténtalo de nuevo.");
+      if (!navigator.onLine) {
+        setError("Sin conexión a internet. Verifica tu red.");
+      } else if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError("No se pudo conectar con el servidor. Verifica que el servicio esté disponible.");
+      } else {
+        setError(err?.message || "Ocurrió un error inesperado. Intenta de nuevo.");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -68,7 +146,7 @@ export default function LoginPage() {
 
       <div className="login-container">
         <div className="login-header">
-          <div className="logo">L</div>
+          <div className="logo">Met</div>
           <h1 className="login-title">Bienvenido</h1>
           <p className="login-subtitle">Inicia sesión en tu cuenta</p>
         </div>
@@ -80,11 +158,14 @@ export default function LoginPage() {
             <label className="input-label" htmlFor="nomina">Número de Nómina</label>
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               id="nomina"
               value={nomina}
               onChange={(e) => setNomina(e.target.value)}
               className="input-field"
               placeholder="Ingresa tu número de nómina"
+              disabled={segundosRestantes > 0}
               required
             />
           </div>
@@ -98,27 +179,26 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="input-field"
               placeholder="Ingresa tu contraseña"
+              disabled={segundosRestantes > 0}
               required
             />
           </div>
 
-          <div className="login-options">
-            <label className="remember-me">
-              <input type="checkbox" className="checkbox" />
-              <span>Recordarme</span>
-            </label>
-            <a href="#" className="forgot-password">¿Olvidaste tu contraseña?</a>
-          </div>
-
-          <button type="submit" className="login-button">
-            Iniciar Sesión
+          <button type="submit" className="submit-button" disabled={loading || segundosRestantes > 0}>
+            {segundosRestantes > 0
+              ? `Bloqueado (${segundosRestantes}s)`
+              : loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
-
-        <div className="login-footer">
-          <p>¿No tienes una cuenta? <a href="#" className="signup-link">Regístrate aquí</a></p>
-        </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -1,0 +1,72 @@
+{
+  "id": "/",
+  "name": "WWW MetPre - Sistema de Gestión",
+  "short_name": "MetPre",
+  "description": "Sistema de gestión de mermas, valores y operaciones para sucursales",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2368b3",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Valores",
+      "short_name": "Valores",
+      "description": "Registrar y consultar movimientos de valores",
+      "url": "/valores"
+    },
+    {
+      "name": "Mermas",
+      "short_name": "Mermas",
+      "description": "Registrar y consultar mermas",
+      "url": "/mermas"
+    },
+    {
+      "name": "Apertura/Cierre",
+      "short_name": "Apertura/Cierre",
+      "description": "Registrar apertura o cierre de sucursal",
+      "url": "/apertura-cierres"
+    },
+    {
+      "name": "Próximos a Caducar",
+      "short_name": "Caducidad",
+      "description": "Gestionar productos próximos a caducar",
+      "url": "/proximoscaducar"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Resumen del dashboard en vista móvil"
+    },
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Resumen del dashboard en vista de escritorio"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "lang": "es-MX",
+  "dir": "ltr",
+  "scope": "/",
+  "prefer_related_applications": false
+}
