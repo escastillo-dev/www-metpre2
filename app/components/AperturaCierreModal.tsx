@@ -1,1084 +1,202 @@
-import React, { useState, useEffect } from 'react';
+﻿'use client';
+
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import '../styles/apertura-cierre-modal.css';
 
-interface Equipment {
-  id: string;
-  name: string;
-  icon: string;
+interface Equipment { id: string; name: string; icon: string }
+interface EquipmentEvaluation { status: string; comment: string }
+interface Sucursal { idCentro: string; Sucursal: string }
+interface RegistroData {
+  sucursal: string; fecha: string; horaInicio: string; horaFin: string;
+  anfitrion: string; plantilla: string; candados: number; comentarios: string;
 }
-
-interface EquipmentEvaluation {
-  status: string;
-  comment: string;
-}
-
-interface Sucursal {
-  idCentro: string;
-  Sucursal: string;
-}
-
 interface AperturaCierreModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: RegistroData & {
+    tipo: 'apertura' | 'cierre';
+    equipos: Array<EquipmentEvaluation & { id: string }>;
+  }) => Promise<void>;
   equipmentList: Equipment[];
   sucursalesAsignadas: Sucursal[];
   tipo: 'apertura' | 'cierre';
   guardando: boolean;
 }
 
-const AperturaCierreModal: React.FC<AperturaCierreModalProps> = ({
-  isOpen,
-  onClose,
-  onSubmit,
-  equipmentList,
-  sucursalesAsignadas,
-  tipo,
-  guardando
-}) => {
-  const [formData, setFormData] = useState({
-    sucursal: '',
-    fecha: new Date().toISOString().split('T')[0],
-    horaInicio: new Date().toTimeString().slice(0, 5),
-    horaFin: '',
-    anfitrion: '',
-    plantilla: '',
-    candados: 0,
-    comentarios: ''
-  });
+function initialForm(): RegistroData {
+  const now = new Date();
+  const fecha = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return { sucursal: '', fecha, horaInicio: now.toTimeString().slice(0, 5),
+    horaFin: '', anfitrion: '', plantilla: '', candados: 0, comentarios: '' };
+}
 
-  const [equipmentEvaluations, setEquipmentEvaluations] = useState<{ [key: string]: EquipmentEvaluation }>({});
-  const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
+const statusOptions = [
+  { value: 'B', label: 'Bien' },
+  { value: 'R', label: 'Regular' },
+  { value: 'M', label: 'Mal' }
+];
+const steps = ['Datos generales', 'Evaluar equipos', 'Revisar registro'];
 
-  // Initialize equipment evaluations based on equipmentList
-  useEffect(() => {
-    if (equipmentList.length > 0) {
-      const initialEvaluations: { [key: string]: EquipmentEvaluation } = {};
-      equipmentList.forEach(equipment => {
-        if (!equipmentEvaluations[equipment.id]) {
-          initialEvaluations[equipment.id] = { status: '', comment: '' };
-        } else {
-          initialEvaluations[equipment.id] = equipmentEvaluations[equipment.id];
-        }
-      });
-      setEquipmentEvaluations(initialEvaluations);
-    }
-  }, [equipmentList]);
+export default function AperturaCierreModal({ isOpen, onClose, onSubmit, equipmentList,
+  sucursalesAsignadas, tipo, guardando }: AperturaCierreModalProps) {
+  const [formData, setFormData] = useState(initialForm);
+  const [evaluations, setEvaluations] = useState<Record<string, EquipmentEvaluation>>({});
+  const [step, setStep] = useState(1);
+  const [showErrors, setShowErrors] = useState(false);
+  const id = useId();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const containerRef = useFocusTrap<HTMLDivElement>(isOpen, () => { if (!guardando) onClose(); });
 
-  // Reset form when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
-      setCurrentStep(1);
-      setFormData({
-        sucursal: '',
-        fecha: new Date().toISOString().split('T')[0],
-        horaInicio: new Date().toTimeString().slice(0, 5),
-        horaFin: '',
-        anfitrion: '',
-        plantilla: '',
-        candados: 0,
-        comentarios: ''
-      });
-      // Reset equipment evaluations
-      const resetEvaluations: { [key: string]: EquipmentEvaluation } = {};
-      equipmentList.forEach(equipment => {
-        resetEvaluations[equipment.id] = { status: '', comment: '' };
-      });
-      setEquipmentEvaluations(resetEvaluations);
+      setFormData(initialForm());
+      setEvaluations({});
+      setStep(1);
+      setShowErrors(false);
     }
-  }, [isOpen, equipmentList]);
+  }, [isOpen]);
 
-  const handleEquipmentStatusChange = (equipmentId: string, status: string) => {
-    setEquipmentEvaluations(prev => ({
-      ...prev,
-      [equipmentId]: {
-        ...prev[equipmentId],
-        status: status
-      }
-    }));
-  };
-
-  const handleEquipmentCommentChange = (equipmentId: string, comment: string) => {
-    setEquipmentEvaluations(prev => ({
-      ...prev,
-      [equipmentId]: {
-        ...prev[equipmentId],
-        comment: comment
-      }
-    }));
-  };
-
-  const validateCurrentStep = () => {
-    switch (currentStep) {
-      case 1:
-        return formData.sucursal && formData.fecha && formData.horaInicio && formData.anfitrion;
-      case 2:
-        // Verificar que todos los equipos de la lista tengan un estado evaluado
-        const evaluatedCount = equipmentList.filter(equipment => 
-          equipmentEvaluations[equipment.id]?.status && equipmentEvaluations[equipment.id]?.status !== ''
-        ).length;
-        return evaluatedCount === equipmentList.length;
-      case 3:
-        return true; // Step 3 is optional review
-      default:
-        return false;
-    }
-  };
-
-  const getStep1MissingFields = (): string[] => {
-    const missing: string[] = [];
-    if (!formData.sucursal) missing.push('Sucursal');
-    if (!formData.fecha) missing.push('Fecha');
-    if (!formData.horaInicio) missing.push('Hora de Inicio');
-    if (!formData.anfitrion) missing.push('Anfitrión');
-    return missing;
-  };
-
-  const handleNext = () => {
-    if (guardando) return;
-    if (validateCurrentStep() && currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handlePrev = () => {
-    if (guardando) return;
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (guardando) return;
-    if (validateCurrentStep()) {
-      // Prepare data for submission
-      const equipmentsForAPI: any[] = [];
-      
-      Object.entries(equipmentEvaluations).forEach(([equipmentId, evaluation]) => {
-        if (evaluation.status) {
-          equipmentsForAPI.push({
-            id: equipmentId,
-            status: evaluation.status,
-            comment: evaluation.comment || ''
-          });
-        }
-      });
-
-      const modalData = {
-        ...formData,
-        tipo: tipo,
-        equipos: equipmentsForAPI
-      };
-
-      await onSubmit(modalData);
-    }
-  };
-
-  const getCompletedEquipmentCount = () => {
-    return equipmentList.filter(equipment => 
-      equipmentEvaluations[equipment.id]?.status && equipmentEvaluations[equipment.id]?.status !== ''
-    ).length;
-  };
-
-  const statusOptions = [
-    { value: 'B', label: 'Bien', color: '#48bb78', emoji: '✅' },
-    { value: 'R', label: 'Regular', color: '#ed8936', emoji: '⚠️' },
-    { value: 'M', label: 'Mal', color: '#e53e3e', emoji: '❌' }
-  ];
-
-  // Responsive modal logic
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    if (isOpen) {
+      bodyRef.current?.scrollTo({ top: 0 });
+      headingRef.current?.focus({ preventScroll: true });
+    }
+  }, [step, isOpen]);
 
-  // Responsive styles solo para móvil
-  const isMobile = windowWidth < 768;
-  const modalStyle: React.CSSProperties = isMobile ? {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '8px',
-    overflowY: 'auto'
-  } : {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '20px',
-    overflowY: 'auto'
+  const missing = [
+    !formData.sucursal && 'Sucursal', !formData.fecha && 'Fecha',
+    !formData.horaInicio && 'Hora de inicio', !formData.anfitrion.trim() && 'Anfitrión'
+  ].filter(Boolean);
+  const completed = equipmentList.filter(e => evaluations[e.id]?.status).length;
+  const allEvaluated = completed === equipmentList.length;
+  const update = <K extends keyof RegistroData>(field: K, value: RegistroData[K]) =>
+    setFormData(prev => ({ ...prev, [field]: value }));
+  const evaluate = (equipmentId: string, patch: Partial<EquipmentEvaluation>) =>
+    setEvaluations(prev => ({ ...prev, [equipmentId]: {
+      status: prev[equipmentId]?.status || '', comment: prev[equipmentId]?.comment || '', ...patch
+    } }));
+
+  const handleContinue = () => {
+    if (guardando) return;
+    if ((step === 1 && missing.length > 0) || (step === 2 && !allEvaluated)) {
+      setShowErrors(true);
+      const selector = step === 1 ? ':invalid' : '[data-pending="true"] input';
+      const field = bodyRef.current?.querySelector<HTMLElement>(selector);
+      field?.focus();
+      return;
+    }
+    setShowErrors(false);
+    setStep(prev => Math.min(3, prev + 1));
   };
-  const cardStyle: React.CSSProperties = isMobile ? {
-    background: 'white',
-    borderRadius: '16px',
-    width: '95%',
-    maxWidth: '98vw',
-    maxHeight: '90vh',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: '0 5px 15px rgba(0,0,0,0.08)'
-  } : {
-    background: 'white',
-    borderRadius: '16px',
-    width: '100%',
-    maxWidth: '900px',
-    maxHeight: '90vh',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column'
+  const handleSubmit = async () => {
+    if (guardando || missing.length > 0 || !allEvaluated) return;
+    await onSubmit({ ...formData, tipo, equipos: equipmentList.map(e => ({ id: e.id, ...evaluations[e.id] })) });
   };
-  const stepperPadding = isMobile ? '12px 10px' : '24px 32px';
-  const stepperFont = isMobile ? '12px' : '16px';
-  const stepperCircle = isMobile ? '28px' : '40px';
-  const stepperMarginBottom = isMobile ? '18px' : '32px';
-  const stepperPaddingTop = isMobile ? '10px' : '24px';
-  const gridColumns1 = isMobile ? 1 : 2;
-  const gridColumns2 = isMobile ? 1 : 3;
-  const gridGap = isMobile ? '12px' : '20px';
-  const inputHeight = isMobile ? '48px' : '40px';
-  const buttonStack = isMobile ? 'column' : 'row';
-  const buttonGap = isMobile ? '8px' : '12px';
-
-  const containerRef = useFocusTrap<HTMLDivElement>(isOpen, onClose);
-
+  const invalid = (empty: boolean) => showErrors && empty;
   if (!isOpen) return null;
 
-  return (
-    <div style={modalStyle}>
-      <div style={cardStyle} ref={containerRef} role="dialog" aria-modal="true" aria-label={tipo === 'apertura' ? 'Nueva apertura' : 'Nuevo cierre'} tabIndex={-1}>
-        {/* Header */}
-        <div style={{
-          background: tipo === 'apertura' 
-            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-            : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-          color: 'white',
-          padding: stepperPadding,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '600' }}>
-              {tipo === 'apertura' ? '🌅 Nueva Apertura' : '🌙 Nuevo Cierre'}
-            </h2>
-            <p style={{ margin: '4px 0 0 0', fontSize: '16px', opacity: 0.9 }}>
-              Paso {currentStep} de {totalSteps}
-            </p>
-          </div>
-          <button 
-            onClick={onClose}
-            disabled={guardando}
-            style={{
-              background: 'rgba(255, 255, 255, 0.2)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '20px',
-              color: 'white'
-            }}
-          >
-            ×
-          </button>
+  return createPortal(
+    <div className="apci-overlay">
+      <div className={`apci-dialog apci-dialog--${tipo}`} ref={containerRef} role="dialog"
+        aria-modal="true" aria-labelledby={`${id}-title`} tabIndex={-1} aria-busy={guardando}>
+        <header className="apci-header">
+          <div><p className="apci-eyebrow">Registro de sucursal</p>
+            <h2 id={`${id}-title`}>{tipo === 'apertura' ? 'Nueva apertura' : 'Nuevo cierre'}</h2></div>
+          <button type="button" className="apci-close" aria-label="Cerrar registro" onClick={onClose} disabled={guardando}>×</button>
+        </header>
+        <nav className="apci-progress" aria-label="Progreso del registro">
+          <ol>{steps.map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined}
+            className={step >= index + 1 ? 'apci-step-active' : ''}>
+            <span>{index + 1}</span><span>{label}</span>
+          </li>)}</ol>
+        </nav>
+        <div className="apci-body" ref={bodyRef}>
+          <h3 ref={headingRef} tabIndex={-1} className="apci-step-title">{steps[step - 1]}</h3>
+          {step === 1 && <>
+            <p className="apci-help">Los campos con * son obligatorios.</p>
+            <div className="apci-fields">
+              <label className="apci-full">Sucursal *
+                <select value={formData.sucursal} onChange={e => update('sucursal', e.target.value)} required
+                  aria-invalid={invalid(!formData.sucursal)}>
+                  <option value="">Selecciona una sucursal</option>
+                  {sucursalesAsignadas.map(s => <option key={s.idCentro} value={s.idCentro}>{s.Sucursal}</option>)}
+                </select>
+              </label>
+              <label className="apci-full">Fecha *<input type="date" value={formData.fecha} required
+                aria-invalid={invalid(!formData.fecha)} onChange={e => update('fecha', e.target.value)} /></label>
+              <label>Hora de inicio *<input type="time" value={formData.horaInicio} required
+                aria-invalid={invalid(!formData.horaInicio)} onChange={e => update('horaInicio', e.target.value)} /></label>
+              <label>Hora de fin<input type="time" value={formData.horaFin} onChange={e => update('horaFin', e.target.value)} /></label>
+              <label className="apci-full">Anfitrión *<input type="text" inputMode="numeric" pattern="[0-9]*"
+                value={formData.anfitrion} required placeholder="Número de nómina"
+                aria-invalid={invalid(!formData.anfitrion.trim())} onChange={e => update('anfitrion', e.target.value)} /></label>
+              <label>Plantilla<input type="text" inputMode="numeric" pattern="[0-9]*" value={formData.plantilla}
+                onChange={e => update('plantilla', e.target.value)} /></label>
+              <label>Candados<input type="text" inputMode="numeric" pattern="[0-9]*" value={formData.candados || ''}
+                onChange={e => update('candados', Math.max(0, parseInt(e.target.value) || 0))} /></label>
+            </div>
+            {showErrors && missing.length > 0 && <p className="apci-error" role="alert">Completa: {missing.join(', ')}.</p>}
+          </>}
+          {step === 2 && <>
+            <p className="apci-help" role="status">{completed} de {equipmentList.length} equipos evaluados. Selecciona un estado para cada equipo.</p>
+            <div className="apci-equipment-list">{equipmentList.map((equipment, index) =>
+              <fieldset className="apci-equipment" key={equipment.id} data-pending={!evaluations[equipment.id]?.status}>
+                <legend><span aria-hidden="true">{equipment.icon} </span>{index + 1}. {equipment.name}</legend>
+                <div className="apci-status-options">{statusOptions.map(status =>
+                  <label className={`apci-status apci-status--${status.value}`} key={status.value}>
+                    <input type="radio" name={`${id}-equipment-${equipment.id}`} value={status.value}
+                      checked={evaluations[equipment.id]?.status === status.value}
+                      onChange={() => evaluate(equipment.id, { status: status.value })} />
+                    <span>{status.label}</span>
+                  </label>
+                )}</div>
+                <details className="apci-comment"><summary>Comentario opcional{evaluations[equipment.id]?.comment ? ' · Agregado' : ''}</summary>
+                  <label>Detalle de {equipment.name}<textarea rows={2} value={evaluations[equipment.id]?.comment || ''}
+                    onChange={e => evaluate(equipment.id, { comment: e.target.value })} placeholder="Describe lo que observaste" /></label>
+                </details>
+              </fieldset>
+            )}</div>
+            {showErrors && !allEvaluated && <p className="apci-error" role="alert">Faltan {equipmentList.length - completed} equipos por evaluar.</p>}
+          </>}
+          {step === 3 && <>
+            <p className="apci-help">Confirma los datos antes de registrar {tipo === 'apertura' ? 'la apertura' : 'el cierre'}.</p>
+            <section className="apci-review"><div className="apci-section-heading"><h4>Datos generales</h4>
+              <button type="button" className="apci-edit" onClick={() => setStep(1)} disabled={guardando}>Editar datos</button></div>
+              <dl>{[
+                ['Sucursal', sucursalesAsignadas.find(s => s.idCentro === formData.sucursal)?.Sucursal],
+                ['Fecha', formData.fecha], ['Hora de inicio', formData.horaInicio], ['Hora de fin', formData.horaFin || 'Sin especificar'],
+                ['Anfitrión', formData.anfitrion], ['Plantilla', formData.plantilla || 'Sin especificar'], ['Candados', formData.candados]
+              ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+            </section>
+            <section className="apci-review"><div className="apci-section-heading"><h4>Equipos ({completed}/{equipmentList.length})</h4>
+              <button type="button" className="apci-edit" onClick={() => setStep(2)} disabled={guardando}>Editar equipos</button></div>
+              <ul className="apci-review-equipment">{equipmentList.map(e => <li key={e.id}>
+                <div><span>{e.name}</span><strong className={`apci-result--${evaluations[e.id]?.status}`}>
+                  {statusOptions.find(s => s.value === evaluations[e.id]?.status)?.label || 'Sin evaluar'}</strong></div>
+                {evaluations[e.id]?.comment && <p>{evaluations[e.id].comment}</p>}
+              </li>)}</ul>
+            </section>
+            <label className="apci-final-comment">Comentarios finales (opcional)<textarea rows={3} value={formData.comentarios}
+              onChange={e => update('comentarios', e.target.value)} placeholder="Agrega información sobre el recorrido" /></label>
+          </>}
         </div>
-
-        {/* Progress Bar */}
-        <div style={{ padding: isMobile ? '0 12px' : '0 32px' }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            marginBottom: stepperMarginBottom,
-            paddingTop: stepperPaddingTop
-          }}>
-            {[1, 2, 3].map((step) => (
-              <div key={step} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                <div style={{
-                  width: stepperCircle,
-                  height: stepperCircle,
-                  flexShrink: 0,
-                  borderRadius: '50%',
-                  background: currentStep >= step 
-                    ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
-                    : '#e2e8f0',
-                  color: currentStep >= step ? 'white' : '#a0aec0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '600',
-                  fontSize: stepperFont
-                }}>
-                  {step}
-                </div>
-                {step < 3 && (
-                  <div style={{
-                    flex: 1,
-                    height: '2px',
-                    background: currentStep > step ? (tipo === 'apertura' ? '#667eea' : '#f093fb') : '#e2e8f0',
-                    margin: isMobile ? '0 6px' : '0 16px'
-                  }} />
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Step Labels */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: `repeat(3, 1fr)`,
-            gap: gridGap,
-            marginBottom: stepperMarginBottom,
-            textAlign: 'center',
-            fontSize: stepperFont
-          }}>
-            <div>
-              <div style={{ fontWeight: '600', color: currentStep >= 1 ? '#2d3748' : '#a0aec0' }}>
-                Información Básica
-              </div>
-            </div>
-            <div>
-              <div style={{ fontWeight: '600', color: currentStep >= 2 ? '#2d3748' : '#a0aec0' }}>
-                Equipos ({getCompletedEquipmentCount()}/{equipmentList.length})
-              </div>
-            </div>
-            <div>
-              <div style={{ fontWeight: '600', color: currentStep >= 3 ? '#2d3748' : '#a0aec0' }}>
-                Revisión
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div style={{ 
-          flex: 1, 
-          overflowY: 'auto', 
-          padding: windowWidth < 768 ? '0 8px' : windowWidth < 1024 ? '0 16px' : '0 32px',
-          marginBottom: windowWidth < 768 ? '12px' : '24px'
-        }}>
-          {/* Step 1: Basic Information */}
-          {currentStep === 1 && (
-            <div>
-              <h3 style={{ color: '#2d3748', marginBottom: '25px', fontSize: '20px' }}>
-                📋 Información General
-              </h3>
-              {isMobile ? (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginBottom: '12px' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Sucursal *
-                      </label>
-                      <select
-                        value={formData.sucursal}
-                        onChange={e => setFormData({...formData, sucursal: e.target.value})}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      >
-                        <option value="">Selecciona una sucursal</option>
-                        {sucursalesAsignadas.map(sucursal => (
-                          <option key={sucursal.idCentro} value={sucursal.idCentro}>
-                            {sucursal.Sucursal}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Fecha *
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.fecha}
-                        onChange={e => setFormData({...formData, fecha: e.target.value})}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginBottom: '12px' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Hora de Inicio *
-                      </label>
-                      <input
-                        type="time"
-                        value={formData.horaInicio}
-                        onChange={e => setFormData({...formData, horaInicio: e.target.value})}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Hora de Fin
-                      </label>
-                      <input
-                        type="time"
-                        value={formData.horaFin}
-                        onChange={e => setFormData({...formData, horaFin: e.target.value})}
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Anfitrión *
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={formData.anfitrion}
-                        onChange={e => setFormData({...formData, anfitrion: e.target.value})}
-                        required
-                        placeholder="Número de nómina del anfitrión"
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Plantilla
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.plantilla}
-                        onChange={e => setFormData({...formData, plantilla: e.target.value})}
-                        placeholder="Número de plantilla"
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          height: inputHeight,
-                          minHeight: inputHeight
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Candados
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={formData.candados || ''}
-                        onChange={e => setFormData({...formData, candados: parseInt(e.target.value) || 0})}
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '20px' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Sucursal *
-                      </label>
-                      <select
-                        value={formData.sucursal}
-                        onChange={e => setFormData({...formData, sucursal: e.target.value})}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      >
-                        <option value="">Selecciona una sucursal</option>
-                        {sucursalesAsignadas.map(sucursal => (
-                          <option key={sucursal.idCentro} value={sucursal.idCentro}>
-                            {sucursal.Sucursal}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Fecha *
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.fecha}
-                        onChange={e => setFormData({...formData, fecha: e.target.value})}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '20px' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Hora de Inicio *
-                      </label>
-                      <input
-                        type="time"
-                        value={formData.horaInicio}
-                        onChange={e => setFormData({...formData, horaInicio: e.target.value})}
-                        required
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Hora de Fin
-                      </label>
-                      <input
-                        type="time"
-                        value={formData.horaFin}
-                        onChange={e => setFormData({...formData, horaFin: e.target.value})}
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Anfitrión *
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={formData.anfitrion}
-                        onChange={e => setFormData({...formData, anfitrion: e.target.value})}
-                        required
-                        placeholder="Número de nómina del anfitrión"
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Plantilla
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.plantilla}
-                        onChange={e => setFormData({...formData, plantilla: e.target.value})}
-                        placeholder="Número de plantilla"
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Candados
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={formData.candados || ''}
-                        onChange={e => setFormData({...formData, candados: parseInt(e.target.value) || 0})}
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Step 2: Equipment Evaluation with Checkboxes */}
-          {currentStep === 2 && (
-            <div>
-              <div style={{ marginBottom: '25px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <h3 style={{ color: '#2d3748', margin: 0, fontSize: '20px' }}>
-                    🔧 Evaluación de Equipos
-                  </h3>
-                  <div style={{ 
-                    background: getCompletedEquipmentCount() === equipmentList.length ? '#d4edda' : '#fff3cd', 
-                    color: getCompletedEquipmentCount() === equipmentList.length ? '#155724' : '#856404', 
-                    padding: '8px 16px', 
-                    borderRadius: '20px',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}>
-                    {getCompletedEquipmentCount()} / {equipmentList.length} completados
-                  </div>
-                </div>
-                
-                {getCompletedEquipmentCount() < equipmentList.length && (
-                  <div style={{
-                    background: '#fef7e0',
-                    border: '1px solid #f6e05e',
-                    borderRadius: '8px',
-                    padding: '12px 16px',
-                    fontSize: '14px',
-                    color: '#744210'
-                  }}>
-                    ⚡ Evalúa todos los equipos para continuar al siguiente paso
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: 'grid', gap: '20px' }}>
-                {equipmentList.map(equipment => (
-                  <div key={equipment.id} style={{
-                    background: 'white',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '12px',
-                    padding: windowWidth < 768 ? '12px' : '20px',
-                    boxShadow: equipmentEvaluations[equipment.id]?.status ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none',
-                    marginBottom: windowWidth < 768 ? '8px' : '0'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-                      <span style={{ fontSize: '28px' }}>{equipment.icon}</span>
-                      <h4 style={{ margin: 0, color: '#2d3748', fontSize: '18px', fontWeight: '600', flex: 1 }}>
-                        {equipment.name}
-                      </h4>
-                      {equipmentEvaluations[equipment.id]?.status ? (
-                        <div style={{ 
-                          background: 'linear-gradient(135deg, #48bb78, #38a169)', 
-                          color: 'white', 
-                          borderRadius: '20px', 
-                          padding: '6px 16px', 
-                          fontSize: '13px', 
-                          fontWeight: '600',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: '0 2px 8px rgba(72, 187, 120, 0.3)'
-                        }}>
-                          ✓ Evaluado
-                        </div>
-                      ) : (
-                        <div style={{ 
-                          background: '#fed7d7', 
-                          color: '#c53030', 
-                          borderRadius: '20px', 
-                          padding: '6px 16px', 
-                          fontSize: '13px', 
-                          fontWeight: '600',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}>
-                          ⏳ Pendiente
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Checkboxes for Status */}
-                    <div style={{ marginBottom: '15px' }}>
-                      <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500', color: '#2d3748' }}>
-                        Estado del equipo: *
-                      </label>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                        {statusOptions.map(status => (
-                          <label key={status.value} style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: windowWidth < 768 ? '12px 8px' : '12px 16px',
-                            minHeight: 44,
-                            border: `2px solid ${equipmentEvaluations[equipment.id]?.status === status.value ? status.color : '#e2e8f0'}`,
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            background: equipmentEvaluations[equipment.id]?.status === status.value ? `${status.color}15` : 'white',
-                            transition: 'all 0.2s ease',
-                            fontSize: windowWidth < 768 ? '13px' : '14px',
-                            fontWeight: '500'
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={equipmentEvaluations[equipment.id]?.status === status.value}
-                              onChange={() => handleEquipmentStatusChange(equipment.id, status.value)}
-                              style={{ display: 'none' }}
-                            />
-                            <span style={{ fontSize: '16px' }}>{status.emoji}</span>
-                            <span style={{ color: equipmentEvaluations[equipment.id]?.status === status.value ? status.color : '#4a5568' }}>
-                              {status.label}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Comment TextArea */}
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                        Comentarios adicionales:
-                      </label>
-                      <textarea
-                        value={equipmentEvaluations[equipment.id]?.comment || ''}
-                        onChange={e => handleEquipmentCommentChange(equipment.id, e.target.value)}
-                        rows={2}
-                        placeholder="Describe detalles del estado del equipo (opcional)..."
-                        style={{ 
-                          width: '100%', 
-                          padding: '12px', 
-                          border: '1px solid #e2e8f0', 
-                          borderRadius: '8px', 
-                          resize: 'vertical',
-                          fontSize: windowWidth < 768 ? '13px' : '14px',
-                          minHeight: windowWidth < 768 ? '48px' : '40px'
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Review */}
-          {currentStep === 3 && (
-            <div>
-              <h3 style={{ color: '#2d3748', marginBottom: '25px', fontSize: '20px' }}>
-                📋 Revisión Final
-              </h3>
-              
-              <div style={{ background: '#f7fafc', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
-                <h4 style={{ color: '#2d3748', marginBottom: '15px' }}>Información General:</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-                  <div><strong>Sucursal:</strong> {sucursalesAsignadas.find(s => s.idCentro === formData.sucursal)?.Sucursal}</div>
-                  <div><strong>Fecha:</strong> {formData.fecha}</div>
-                  <div><strong>Hora Inicio:</strong> {formData.horaInicio}</div>
-                  <div><strong>Anfitrión:</strong> {formData.anfitrion}</div>
-                  <div><strong>Candados:</strong> {formData.candados}</div>
-                </div>
-              </div>
-
-              <div style={{ background: '#f7fafc', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
-                <h4 style={{ color: '#2d3748', marginBottom: '15px' }}>Evaluación de Equipos:</h4>
-                {equipmentList.map(equipment => (
-                  <div key={equipment.id} style={{ marginBottom: '10px', padding: '10px', background: 'white', borderRadius: '8px' }}>
-                    <span>{equipment.icon} {equipment.name}: </span>
-                    <span style={{ 
-                      fontWeight: 'bold',
-                      color: equipmentEvaluations[equipment.id]?.status === 'B' ? '#48bb78' : 
-                            equipmentEvaluations[equipment.id]?.status === 'R' ? '#ed8936' : '#e53e3e'
-                    }}>
-                      {equipmentEvaluations[equipment.id]?.status === 'B' ? '✅ Bien' : 
-                       equipmentEvaluations[equipment.id]?.status === 'R' ? '⚠️ Regular' : 
-                       equipmentEvaluations[equipment.id]?.status === 'M' ? '❌ Mal' : 'Sin evaluar'}
-                    </span>
-                    {equipmentEvaluations[equipment.id]?.comment && (
-                      <div style={{ fontSize: '12px', color: '#4a5568', marginTop: '5px' }}>
-                        💬 {equipmentEvaluations[equipment.id].comment}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#2d3748' }}>
-                  Comentarios finales:
-                </label>
-                <textarea
-                  value={formData.comentarios}
-                  onChange={e => setFormData({...formData, comentarios: e.target.value})}
-                  rows={4}
-                  placeholder="Comentarios adicionales sobre el registro..."
-                  style={{ 
-                    width: '100%', 
-                    padding: '12px', 
-                    border: '1px solid #e2e8f0', 
-                    borderRadius: '8px', 
-                    resize: 'vertical',
-                    fontSize: '14px'
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {currentStep === 1 && !validateCurrentStep() && (
-          <div
-            role="alert"
-            style={{
-              margin: isMobile ? '0 10px 12px' : '0 32px 16px',
-              padding: '10px 14px',
-              background: '#fff5f5',
-              border: '1px solid #feb2b2',
-              borderRadius: '8px',
-              color: '#c53030',
-              fontSize: isMobile ? '13px' : '14px'
-            }}
-          >
-            Completa los campos obligatorios para continuar: {getStep1MissingFields().join(', ')}
-          </div>
-        )}
-
-        {/* Footer with buttons */}
-        <div style={{ 
-          padding: windowWidth < 768 ? '16px 10px' : '24px 32px',
-          background: '#f9fafb',
-        }}>
-          {isMobile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Acción principal primero: más accesible con el pulgar en móvil */}
-              {currentStep < totalSteps ? (
-                <button
-                  onClick={handleNext}
-                  disabled={guardando || !validateCurrentStep()}
-                  style={{
-                    padding: '14px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    background: validateCurrentStep()
-                      ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
-                      : '#e2e8f0',
-                    color: validateCurrentStep() ? 'white' : '#a0aec0',
-                    cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
-                    fontSize: '15px',
-                    fontWeight: '600',
-                    width: '100%',
-                    minHeight: 48
-                  }}
-                >
-                  Siguiente →
-                </button>
-              ) : (
-                <button
-                  onClick={handleSubmit}
-                  disabled={guardando || !validateCurrentStep()}
-                  style={{
-                    padding: '14px',
-                    border: 'none',
-                    borderRadius: '8px',
-                    background: validateCurrentStep()
-                      ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
-                      : '#e2e8f0',
-                    color: validateCurrentStep() ? 'white' : '#a0aec0',
-                    cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
-                    fontSize: '15px',
-                    fontWeight: '600',
-                    width: '100%',
-                    minHeight: 48
-                  }}
-                >
-                  {guardando ? 'Guardando...' : `✅ Registrar ${tipo === 'apertura' ? 'Apertura' : 'Cierre'}`}
-                </button>
-              )}
-
-              {/* Acciones secundarias en fila compacta */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={handlePrev}
-                  disabled={guardando || currentStep === 1}
-                  style={{
-                    padding: '12px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    background: currentStep === 1 ? '#f7fafc' : 'white',
-                    color: currentStep === 1 ? '#a0aec0' : '#4a5568',
-                    cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    flex: 1,
-                    minHeight: 44
-                  }}
-                >
-                  ← Anterior
-                </button>
-                <button
-                  onClick={onClose}
-                  disabled={guardando}
-                  style={{
-                    padding: '12px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    background: 'white',
-                    color: '#4a5568',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    flex: 1,
-                    minHeight: 44
-                  }}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          ) : (
-          <div style={{ display: buttonStack, gap: buttonGap, justifyContent: 'flex-end', alignItems: 'center' }}>
-            <button
-              onClick={handlePrev}
-              disabled={guardando || currentStep === 1}
-              style={{
-                padding: windowWidth < 768 ? '12px' : '12px 24px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                background: currentStep === 1 ? '#f7fafc' : 'white',
-                color: currentStep === 1 ? '#a0aec0' : '#4a5568',
-                cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                width: windowWidth < 768 ? '100%' : undefined
-              }}
-            >
-              ← Anterior
+        <footer className="apci-footer">
+          <span className="apci-footer-progress">Paso {step} de 3</span>
+          <div className="apci-actions">
+            <button type="button" className="apci-secondary" disabled={guardando}
+              onClick={() => { if (step === 1) onClose(); else { setShowErrors(false); setStep(step - 1); } }}>
+              {step === 1 ? 'Cancelar' : 'Anterior'}
             </button>
-
-            <button
-              onClick={onClose}
-              disabled={guardando}
-              style={{
-                padding: windowWidth < 768 ? '12px' : '12px 24px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                background: 'white',
-                color: '#4a5568',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                width: windowWidth < 768 ? '100%' : undefined
-              }}
-            >
-              Cancelar
+            <button type="button" className="apci-primary" disabled={guardando}
+              onClick={step < 3 ? handleContinue : handleSubmit}>
+              {guardando ? 'Guardando…' : step < 3 ? 'Continuar' : `Registrar ${tipo}`}
             </button>
-
-            {currentStep < totalSteps ? (
-              <button
-                onClick={handleNext}
-                disabled={guardando || !validateCurrentStep()}
-                style={{
-                  padding: windowWidth < 768 ? '12px' : '12px 24px',
-                  border: 'none',
-                  borderRadius: '8px',
-                  background: validateCurrentStep() 
-                    ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
-                    : '#e2e8f0',
-                  color: validateCurrentStep() ? 'white' : '#a0aec0',
-                  cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  width: windowWidth < 768 ? '100%' : undefined
-                }}
-              >
-                Siguiente →
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={guardando || !validateCurrentStep()}
-                style={{
-                  padding: windowWidth < 768 ? '12px' : '12px 24px',
-                  border: 'none',
-                  borderRadius: '8px',
-                  background: validateCurrentStep() 
-                    ? (tipo === 'apertura' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)')
-                    : '#e2e8f0',
-                  color: validateCurrentStep() ? 'white' : '#a0aec0',
-                  cursor: validateCurrentStep() ? 'pointer' : 'not-allowed',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  width: windowWidth < 768 ? '100%' : undefined
-                }}
-              >
-                {guardando ? 'Guardando...' : `✅ Registrar ${tipo === 'apertura' ? 'Apertura' : 'Cierre'}`}
-              </button>
-            )}
           </div>
-          )}
-        </div>
+        </footer>
       </div>
-    </div>
+    </div>, document.body
   );
-};
-
-export default AperturaCierreModal;
+}
