@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import '../styles/recuperaciones.css';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
 import BarcodeScannerModal from './BarcodeScannerModal';
@@ -54,8 +55,10 @@ interface Stats {
 // Este modal es ligeramente más ancho que el resto (más campos por fila).
 const modalContent: React.CSSProperties = { ...modalContentBase, maxWidth: 620, maxHeight: '92vh' };
 
-const formatMXN = (v: number) =>
-  v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+const formatMXN = (v: number | string) =>
+  Number(v).toLocaleString('es-MX', {
+    style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2,
+  });
 
 // --- Componente --------------------------------------------------------------
 
@@ -407,7 +410,7 @@ export default function RecuperacionesContent() {
 
           {/* Top productos */}
           {stats.topProductos?.length > 0 && (
-            <div style={cardStyle}>
+            <div className="recuperaciones-top-productos" style={{ ...cardStyle, minWidth: 0 }}>
               <h4 style={{ margin: '0 0 12px 0', color: '#2d3748', fontSize: 15, fontWeight: 600 }}>📦 Top productos recuperados</h4>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 400 }}>
@@ -421,10 +424,10 @@ export default function RecuperacionesContent() {
                   <tbody>
                     {stats.topProductos.slice(0, 10).map((p, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                        <td style={{ padding: '8px 12px', color: '#2d3748', fontWeight: 500 }}>{p.Producto}</td>
-                        <td style={{ padding: '8px 12px', color: '#a0aec0', fontFamily: 'monospace', fontSize: 11 }}>{p.CodigoBarras}</td>
-                        <td style={{ padding: '8px 12px', color: '#4a5568' }}>{p.totalCantidad} pzs</td>
-                        <td style={{ padding: '8px 12px', color: '#276749', fontWeight: 600 }}>{formatMXN(p.importe)}</td>
+                        <td data-label="Producto" style={{ padding: '8px 12px', color: '#2d3748', fontWeight: 500 }}>{p.Producto}</td>
+                        <td data-label="Código" style={{ padding: '8px 12px', color: '#a0aec0', fontFamily: 'monospace', fontSize: 11 }}>{p.CodigoBarras}</td>
+                        <td data-label="Cantidad" style={{ padding: '8px 12px', color: '#4a5568' }}>{p.totalCantidad} pzs</td>
+                        <td data-label="Importe" style={{ padding: '8px 12px', color: '#276749', fontWeight: 600 }}>{formatMXN(p.importe)}</td>
                       </tr>
                     ))}
                   </tbody>

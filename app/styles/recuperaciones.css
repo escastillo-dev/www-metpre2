@@ -1,0 +1,38 @@
+@media (max-width: 767px) {
+  .recuperaciones-top-productos { padding: 16px !important; }
+  .recuperaciones-top-productos table {
+    display: block;
+    min-width: 0 !important;
+    width: 100%;
+  }
+  .recuperaciones-top-productos thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .recuperaciones-top-productos tbody { display: grid; gap: 12px; }
+  .recuperaciones-top-productos tr {
+    display: grid;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+  .recuperaciones-top-productos td {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 0 !important;
+    overflow-wrap: anywhere;
+    font-size: 14px !important;
+  }
+  .recuperaciones-top-productos td::before {
+    content: attr(data-label);
+    color: #526178;
+    font-family: sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+  }
+}
