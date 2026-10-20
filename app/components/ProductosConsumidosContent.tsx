@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import '../styles/productos-consumidos.css';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
 import BarcodeScannerModal from './BarcodeScannerModal';
@@ -236,7 +237,7 @@ export default function ProductosConsumidosContent() {
   }, [activeTab, fetchListado]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="productos-consumidos" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {notif && (
         <div style={{
           padding: '12px 16px', borderRadius: 8, fontSize: 14, fontWeight: 500,

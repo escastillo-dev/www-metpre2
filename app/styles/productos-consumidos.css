@@ -1,0 +1,9 @@
+/* Los estilos inline compartidos usan 14 px; mantener los campos legibles
+   evita que el navegador amplíe la página al enfocarlos en pantallas táctiles. */
+@media (max-width: 767px), (any-pointer: coarse) {
+  .productos-consumidos input,
+  .productos-consumidos select,
+  .productos-consumidos textarea {
+    font-size: max(16px, 1rem) !important;
+  }
+}
