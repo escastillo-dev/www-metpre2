@@ -7,3 +7,49 @@
     font-size: max(16px, 1rem) !important;
   }
 }
+
+.productos-consumidos,
+.productos-consumidos > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .productos-consumidos .pc-register-card,
+  .productos-consumidos .pc-filters { padding: 16px !important; }
+  .pc-filters > div { width: 100%; min-width: 0 !important; }
+  .pc-pagination { flex-wrap: wrap; max-width: 100%; }
+  .pc-pagination button, .pc-pagination select { min-height: 44px !important; }
+  .pc-list-table { display: block; min-width: 0 !important; width: 100%; }
+  .pc-list-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .pc-list-table tbody { display: grid; gap: 12px; padding: 12px; }
+  .pc-list-table tr {
+    display: grid;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+  .pc-list-table td[data-label] {
+    display: grid;
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 0 !important;
+    max-width: none !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+  .pc-list-table td[data-label]::before {
+    content: attr(data-label);
+    font-family: sans-serif;
+    color: #526178;
+    font-size: 12px;
+    font-weight: 500;
+  }
+}

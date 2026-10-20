@@ -6,7 +6,7 @@ import '../styles/productos-consumidos.css';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
 import BarcodeScannerModal from './BarcodeScannerModal';
-import { cardStyle, inputStyle, labelStyle, btnPrimary, btnSecondary } from '../styles/sharedStyles';
+import { cardStyle, inputStyle as sharedInputStyle, labelStyle, btnPrimary, btnSecondary } from '../styles/sharedStyles';
 
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
@@ -40,6 +40,8 @@ interface ProductoConsumido {
 }
 
 // --- Estilos compartidos -----------------------------------------------------
+
+const inputStyle: React.CSSProperties = { ...sharedInputStyle, fontSize: 16, minWidth: 0, maxWidth: '100%' };
 
 const tabStyle = (active: boolean): React.CSSProperties => ({
   padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
@@ -260,7 +262,7 @@ export default function ProductosConsumidosContent() {
       </div>
 
       {activeTab === 'registrar' && (
-        <div style={{ ...cardStyle, maxWidth: 560 }}>
+        <div className="pc-register-card" style={{ ...cardStyle, maxWidth: 560, minWidth: 0 }}>
           {folioGenerado ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center', padding: '20px 0' }}>
               <div style={{ fontSize: 40 }}>✅</div>
@@ -412,7 +414,7 @@ export default function ProductosConsumidosContent() {
 
       {activeTab === 'listado' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ ...cardStyle, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div className="pc-filters" style={{ ...cardStyle, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ minWidth: 180 }}>
               <label style={labelStyle} htmlFor="pc-filtro-sucursal">Sucursal</label>
               <select id="pc-filtro-sucursal" value={filtroCentro} onChange={e => { setOffset(0); setFiltroCentro(e.target.value); }} style={inputStyle}>
@@ -446,7 +448,7 @@ export default function ProductosConsumidosContent() {
 
           <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 760 }}>
+              <table className="pc-list-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 760 }}>
                 <thead>
                   <tr style={{ background: '#f7fafc' }}>
                     {['Folio', 'Sucursal', 'Colaborador', 'Producto', 'Cantidad', 'Fecha', 'Comentario'].map(h => (
@@ -462,16 +464,16 @@ export default function ProductosConsumidosContent() {
                   ) : (
                     items.map(item => (
                       <tr key={item.idProdConsumido} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                        <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#2368b3' }}>{item.Folio}</td>
-                        <td style={{ padding: '10px 14px', color: '#2d3748' }}>{item.nombreSucursal || item.idCentro}</td>
-                        <td style={{ padding: '10px 14px', color: '#2d3748', fontFamily: 'monospace' }}>{item.idColaborador}</td>
-                        <td style={{ padding: '10px 14px', color: '#2d3748' }}>
-                          {item.nombreProducto || '-'}
-                          <div style={{ fontSize: 11, color: '#a0aec0', fontFamily: 'monospace' }}>{item.CodigoBarras}</div>
+                        <td data-label="Folio" style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#2368b3' }}>{item.Folio}</td>
+                        <td data-label="Sucursal" style={{ padding: '10px 14px', color: '#2d3748' }}>{item.nombreSucursal || item.idCentro}</td>
+                        <td data-label="Colaborador" style={{ padding: '10px 14px', color: '#2d3748', fontFamily: 'monospace' }}>{item.idColaborador}</td>
+                        <td data-label="Producto" style={{ padding: '10px 14px', color: '#2d3748' }}>
+                          <span>{item.nombreProducto || '-'}
+                          <div style={{ fontSize: 11, color: '#a0aec0', fontFamily: 'monospace' }}>{item.CodigoBarras}</div></span>
                         </td>
-                        <td style={{ padding: '10px 14px', color: '#4a5568' }}>{item.Cantidad}</td>
-                        <td style={{ padding: '10px 14px', color: '#718096', whiteSpace: 'nowrap' }}>{formatFechaHora(item.FechaRegistro)}</td>
-                        <td style={{ padding: '10px 14px', color: '#718096', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.Comentario || '-'}</td>
+                        <td data-label="Cantidad" style={{ padding: '10px 14px', color: '#4a5568' }}>{item.Cantidad}</td>
+                        <td data-label="Fecha" style={{ padding: '10px 14px', color: '#718096', whiteSpace: 'nowrap' }}>{formatFechaHora(item.FechaRegistro)}</td>
+                        <td data-label="Comentario" style={{ padding: '10px 14px', color: '#718096', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.Comentario || '-'}</td>
                       </tr>
                     ))
                   )}
@@ -483,7 +485,7 @@ export default function ProductosConsumidosContent() {
               <div style={{ fontSize: 12, color: '#718096' }}>
                 Mostrando {total === 0 ? 0 : offset + 1} - {Math.min(offset + limit, total)} de {total}
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div className="pc-pagination" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0} style={{ ...btnSecondary, padding: '6px 14px', minHeight: 36, opacity: offset === 0 ? 0.5 : 1 }}>Anterior</button>
                 <button onClick={() => setOffset(offset + limit)} disabled={offset + limit >= total} style={{ ...btnSecondary, padding: '6px 14px', minHeight: 36, opacity: offset + limit >= total ? 0.5 : 1 }}>Siguiente</button>
                 <select value={limit} onChange={e => { setOffset(0); setLimit(Number(e.target.value)); }} style={{ ...inputStyle, minHeight: 36, width: 'auto' }}>
