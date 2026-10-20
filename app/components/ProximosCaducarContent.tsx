@@ -91,6 +91,7 @@ const TIPOS_ACCION = [
 ];
 const RESULTADOS_ACCION = ['EN_PROCESO', 'APLICADA', 'NO_APLICA'];
 const RESULTADOS_CIERRE = ['SALIO_EN_VENTA', 'MERMA', 'DEVOLUCION_PROVEEDOR', 'TRANSFERIDO', 'CADUCO_SIN_MOVIMIENTO'];
+const generaMerma = (resultado: string) => ['MERMA', 'CADUCO_SIN_MOVIMIENTO'].includes(resultado);
 
 // --- Componente --------------------------------------------------------------
 
@@ -148,6 +149,7 @@ export default function ProximosCaducarContent() {
   const guardandoNuevoRef = useRef(false);
   const guardandoAccionRef = useRef(false);
   const guardandoCierreRef = useRef(false);
+  const mermasPendientesRef = useRef<Record<number, { idMerma: number; cantidad: number; productoGuardado: boolean }>>({});
 
   const [notif, setNotif] = useState<{ tipo: 'ok' | 'error'; msg: string } | null>(null);
 
@@ -394,6 +396,21 @@ export default function ProximosCaducarContent() {
   const handleGuardarCierre = async () => {
     if (guardandoCierreRef.current) return;
     if (!casoDetalle) return;
+    const registrarMerma = generaMerma(cierreForm.resultadoFinal);
+    const cantidadMerma = cierreForm.cantidadMerma ? Number(cierreForm.cantidadMerma) : Number(casoDetalle.cantidadDetectada);
+    if (registrarMerma && (!Number.isFinite(cantidadMerma) || cantidadMerma <= 0 || cantidadMerma > Number(casoDetalle.cantidadDetectada))) {
+      showNotif('error', 'La cantidad a mermar debe ser mayor a cero y no superar la cantidad detectada.');
+      return;
+    }
+    if (registrarMerma && !casoDetalle.codigoBarras) {
+      showNotif('error', 'El caso no tiene código de barras. No se puede registrar el producto en Mermas.');
+      return;
+    }
+    const pendiente = mermasPendientesRef.current[casoDetalle.idCad];
+    if (pendiente && (!registrarMerma || pendiente.cantidad !== cantidadMerma)) {
+      showNotif('error', `La merma #${pendiente.idMerma} ya fue creada. Reintenta el cierre con la misma cantidad y un resultado que registre merma.`);
+      return;
+    }
     guardandoCierreRef.current = true;
     setGuardandoCierre(true);
     try {
@@ -401,50 +418,59 @@ export default function ProximosCaducarContent() {
       const body: Record<string, unknown> = {
         resultadoFinal: cierreForm.resultadoFinal,
         cantidadSalida: cierreForm.cantidadSalida ? parseFloat(cierreForm.cantidadSalida) : undefined,
-        cantidadMerma:  cierreForm.cantidadMerma  ? parseFloat(cierreForm.cantidadMerma)  : undefined,
+        cantidadMerma:  registrarMerma ? cantidadMerma : undefined,
         comentario:     cierreForm.comentario || undefined,
         idUsuarios:     parseInt(userId) || 0,
       };
 
-      // Si el resultado es MERMA → crear merma automáticamente
-      if (cierreForm.resultadoFinal === 'MERMA') {
+      // Ambos resultados generan la merma antes de cerrar y vinculan su folio.
+      if (registrarMerma) {
         try {
-          // 1. Crear el encabezado de merma
-          const mermaRes = await axios.post(`${API_URL}/mermas`, {
-            idCentro:  casoDetalle.idCentro,
-            Fecha:     new Date().toISOString().split('T')[0],
-            idUsuario: parseInt(userId) || 0,
-            Anfitrion: userId,
-            observaciones: `Caducidad Caso #${casoDetalle.idCad}. ${cierreForm.comentario || ''}`.trim(),
-          }, { headers: getHeaders() });
-
-          // Obtener idMaMe de la respuesta (puede venir directo o en el mensaje)
-          let idMerma: number | null = null;
-          if (mermaRes.data.estatus === 1) {
-            if (mermaRes.data.merma?.idMaMe) {
-              idMerma = mermaRes.data.merma.idMaMe;
-            } else if (mermaRes.data.idMaMe) {
-              idMerma = mermaRes.data.idMaMe;
-            } else if (mermaRes.data.mensaje) {
-              const match = mermaRes.data.mensaje.match(/ID[:\s]+(\d+)/i);
-              if (match) idMerma = parseInt(match[1]);
-            }
-          }
-
+          let idMerma: number | null = pendiente?.idMerma ?? null;
           if (!idMerma) {
-            showNotif('error', 'No se pudo obtener el ID de la merma creada.');
-            setGuardandoCierre(false); return;
+            // 1. Crear el encabezado de merma
+            const mermaRes = await axios.post(`${API_URL}/mermas`, {
+              idCentro:  casoDetalle.idCentro,
+              Fecha:     new Date().toISOString().split('T')[0],
+              idUsuario: parseInt(userId) || 0,
+              Anfitrion: userId,
+              observaciones: `Caducidad Caso #${casoDetalle.idCad}. ${cierreForm.comentario || ''}`.trim(),
+            }, { headers: getHeaders() });
+
+            // Obtener idMaMe de la respuesta (puede venir directo o en el mensaje)
+            if (mermaRes.data.estatus === 1) {
+              if (mermaRes.data.merma?.idMaMe) {
+                idMerma = mermaRes.data.merma.idMaMe;
+              } else if (mermaRes.data.idMaMe) {
+                idMerma = mermaRes.data.idMaMe;
+              } else if (mermaRes.data.mensaje) {
+                const match = mermaRes.data.mensaje.match(/ID[:\s]+(\d+)/i);
+                if (match) idMerma = parseInt(match[1]);
+              }
+            }
+
+            if (!idMerma) {
+              showNotif('error', 'No se pudo obtener el ID de la merma creada.');
+              setGuardandoCierre(false); return;
+            }
+            mermasPendientesRef.current[casoDetalle.idCad] = { idMerma, cantidad: cantidadMerma, productoGuardado: false };
           }
 
           // 2. Agregar el producto a la merma (idMotMer=1 = Caducidad/genérico)
-          if (casoDetalle.codigoBarras) {
+          if (casoDetalle.codigoBarras && !mermasPendientesRef.current[casoDetalle.idCad].productoGuardado) {
             try {
-              await axios.post(`${API_URL}/mermas/${idMerma}/productos`, {
+              const productoRes = await axios.post(`${API_URL}/mermas/${idMerma}/productos`, {
                 CodigoBarras: casoDetalle.codigoBarras,
-                Cantidad:     cierreForm.cantidadMerma ? parseFloat(cierreForm.cantidadMerma) : casoDetalle.cantidadDetectada,
+                Cantidad:     cantidadMerma,
                 idMotMer:     1, // Motivo genérico — caducidad
               }, { headers: getHeaders() });
-            } catch (e) { console.error('Error al agregar producto a merma:', e); }
+              if (productoRes.data?.estatus !== 1) throw new Error('El producto no fue registrado.');
+              mermasPendientesRef.current[casoDetalle.idCad].productoGuardado = true;
+            } catch (e) {
+              console.error('Error al agregar producto a merma:', e);
+              showNotif('error', `No se pudo guardar el producto en la merma #${idMerma}. El caso sigue abierto.`);
+              return;
+            }
           }
 
           body.idMerma = idMerma;
@@ -458,7 +484,8 @@ export default function ProximosCaducarContent() {
       // Registrar el cierre del caso
       const res = await axios.post(`${API_URL}/caducidad/registros/${casoDetalle.idCad}/cierre`, body, { headers: getHeaders() });
       if (res.data.estatus === 1) {
-        showNotif('ok', cierreForm.resultadoFinal === 'MERMA'
+        delete mermasPendientesRef.current[casoDetalle.idCad];
+        showNotif('ok', registrarMerma
           ? `✅ Caso cerrado y merma registrada (ID: ${body.idMerma}).`
           : '✅ Caso cerrado correctamente.');
         setShowCierreModal(false);
@@ -972,7 +999,7 @@ export default function ProximosCaducarContent() {
             <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ background: '#fffaf0', border: '1px solid #f6ad55', borderRadius: 8, padding: 12, fontSize: 13, color: '#744210' }}>
                 ⚠️ Esta acción es irreversible. El caso cambiará a Cerrado.
-                {cierreForm.resultadoFinal === 'MERMA' && (
+                {generaMerma(cierreForm.resultadoFinal) && (
                   <div style={{ marginTop: 6, color: '#c05621', fontWeight: 600 }}>Se creará un registro en Manejo de Mermas.</div>
                 )}
               </div>
@@ -988,11 +1015,12 @@ export default function ProximosCaducarContent() {
                   <input type="number" inputMode="decimal" min="0" step="0.01" value={cierreForm.cantidadSalida} onChange={e => setCierreForm(f => ({ ...f, cantidadSalida: e.target.value }))} style={inputStyle} />
                 </div>
               )}
-              {cierreForm.resultadoFinal === 'MERMA' && (
+              {generaMerma(cierreForm.resultadoFinal) && (
                 <div>
                   <label style={labelStyle}>Cantidad a mermar (opcional)</label>
-                  <input type="number" inputMode="decimal" min="0" step="0.01" placeholder={`Max. ${casoDetalle?.cantidadDetectada}`}
+                  <input type="number" inputMode="decimal" min="0.01" max={casoDetalle?.cantidadDetectada} step="0.01" placeholder={`Max. ${casoDetalle?.cantidadDetectada}`}
                     value={cierreForm.cantidadMerma} onChange={e => setCierreForm(f => ({ ...f, cantidadMerma: e.target.value }))} style={inputStyle} />
+                  <p style={{ margin: '6px 0 0', fontSize: 12, color: '#718096' }}>Si la dejas vacía se registrará toda la cantidad detectada.</p>
                 </div>
               )}
               <div>
