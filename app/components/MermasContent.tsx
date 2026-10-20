@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { createPortal } from 'react-dom';
+import '../styles/mermas-modal.css';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
 import BarcodeScannerModal from './BarcodeScannerModal';
@@ -70,7 +72,22 @@ export default function MermasContent() {
   const [productosDetalle, setProductosDetalle] = useState<any[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
 
-  const nuevaMermaModalRef = useFocusTrap<HTMLDivElement>(showNewMermaModal, () => setShowNewMermaModal(false));
+  const cerrarNuevaMerma = () => {
+    if (guardandoCabeceraRef.current || guardandoProductosRef.current || showScanner) return;
+    if (mermaCreada) {
+      const message = productosSeleccionados.length
+        ? 'La merma ya existe. Los productos seleccionados no se han guardado. ¿Salir y descartar estos productos?'
+        : 'La merma ya existe y permanecerá registrada sin productos. ¿Salir del registro?';
+      if (!window.confirm(message)) return;
+      fetchRegistrosMermas();
+      setStatsKey(prev => prev + 1);
+    }
+    setShowNewMermaModal(false);
+  };
+  const nuevaMermaModalRef = useFocusTrap<HTMLDivElement>(showNewMermaModal, cerrarNuevaMerma);
+  useEffect(() => {
+    if (showNewMermaModal) nuevaMermaModalRef.current?.querySelector('.merma-modal-body')?.scrollTo({ top: 0 });
+  }, [currentStep, showNewMermaModal, nuevaMermaModalRef]);
   const detalleModalRef = useFocusTrap<HTMLDivElement>(showDetalleModal, () => setShowDetalleModal(false));
 
   // Estado para total de pérdidas en dinero
@@ -438,6 +455,10 @@ export default function MermasContent() {
   // Función para manejar el envío del formulario (Paso 1)
   const handleSubmitPaso1 = async () => {
     if (guardandoCabeceraRef.current) return;
+    if (mermaCreada) {
+      setCurrentStep(2);
+      return;
+    }
     guardandoCabeceraRef.current = true;
     setGuardandoCabecera(true);
     try {
@@ -1151,12 +1172,12 @@ export default function MermasContent() {
       </div>
 
       {/* Modal para Nueva Merma - 2 Pasos */}
-      {showNewMermaModal && (
-        <div style={modalOverlay}>
-          <div style={{ ...modalContent, maxWidth: currentStep === 1 ? 560 : 680 }} ref={nuevaMermaModalRef} role="dialog" aria-modal="true" aria-label="Registrar nueva merma" tabIndex={-1}>
+      {showNewMermaModal && createPortal(
+        <div className="merma-modal-overlay" style={modalOverlay}>
+          <div className="merma-modal" style={{ ...modalContent, maxWidth: currentStep === 1 ? 560 : 680 }} ref={nuevaMermaModalRef} role="dialog" aria-modal="true" aria-label="Registrar nueva merma" tabIndex={-1}>
 
             {/* Header */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="merma-modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <h3 style={{ margin: 0, color: '#2368b3', fontSize: 18, fontWeight: 700 }}>📉 Registrar Nueva Merma</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
@@ -1178,7 +1199,8 @@ export default function MermasContent() {
                 </div>
               </div>
               <button
-                onClick={() => setShowNewMermaModal(false)}
+                onClick={cerrarNuevaMerma}
+                aria-label="Cerrar nueva merma"
                 disabled={guardandoCabecera || guardandoProductos}
                 style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#a0aec0', lineHeight: 1 }}
               >
@@ -1189,11 +1211,13 @@ export default function MermasContent() {
             {currentStep === 1 ? (
               // PASO 1: Datos básicos de la merma
               <>
-                <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="merma-modal-body" inert={guardandoCabecera || guardandoProductos} style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <p className="merma-save-status" role="status">{mermaCreada ? 'La merma ya existe. La sucursal y el anfitrión están registrados. El motivo general se usará para los nuevos productos.' : 'Al continuar se crea la merma. Después agregarás y guardarás sus productos.'}</p>
                   <div>
                     <label style={labelStyle} htmlFor="merma-sucursal">Sucursal *</label>
                     <select
                       id="merma-sucursal"
+                      disabled={!!mermaCreada}
                       value={nuevaMerma.idCentro}
                       onChange={(e) => { setNuevaMerma({...nuevaMerma, idCentro: e.target.value}); setNuevaMermaErrors(prev => ({ ...prev, idCentro: undefined })); }}
                       style={{ ...inputStyle, ...(nuevaMermaErrors.idCentro ? { borderColor: '#e53e3e' } : {}) }}
@@ -1218,6 +1242,9 @@ export default function MermasContent() {
                     <label style={labelStyle} htmlFor="merma-anfitrion">Número de nómina del anfitrión *</label>
                     <input
                       id="merma-anfitrion"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      disabled={!!mermaCreada}
                       type="text"
                       value={nuevaMerma.Anfitrion}
                       onChange={(e) => { setNuevaMerma({...nuevaMerma, Anfitrion: e.target.value}); setNuevaMermaErrors(prev => ({ ...prev, Anfitrion: undefined })); }}
@@ -1277,13 +1304,13 @@ export default function MermasContent() {
                 </div>
 
                 {/* Footer Paso 1 */}
-                <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <div className="merma-modal-footer" style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                   <button
-                    onClick={() => setShowNewMermaModal(false)}
+                    onClick={cerrarNuevaMerma}
                     disabled={guardandoCabecera}
                     style={{ ...btnSecondary, opacity: guardandoCabecera ? 0.6 : 1 }}
                   >
-                    Cancelar
+                    {mermaCreada ? 'Salir' : 'Cancelar'}
                   </button>
                   <button
                     onClick={handleSubmitPaso1}
@@ -1294,14 +1321,14 @@ export default function MermasContent() {
                       cursor: (!nuevaMerma.idCentro || !nuevaMerma.Anfitrion) ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {guardandoCabecera ? 'Guardando...' : 'Continuar → Productos'}
+                    {guardandoCabecera ? 'Guardando...' : mermaCreada ? 'Volver a productos' : 'Crear y agregar productos'}
                   </button>
                 </div>
               </>
             ) : (
               // PASO 2: Agregar productos
               <>
-                <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="merma-modal-body" inert={guardandoCabecera || guardandoProductos} style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div style={{ background: '#f0f9ff', padding: 12, borderRadius: 8, border: '1px solid #bae6fd' }}>
                     <p style={{ margin: 0, color: '#075985', fontSize: 13 }}>
                       <strong>Merma #{mermaCreada?.idMaMe}</strong> creada exitosamente.
@@ -1310,8 +1337,8 @@ export default function MermasContent() {
                   </div>
 
                   {/* Buscador de productos */}
-                  <div>
-                    <label style={labelStyle} htmlFor="merma-buscar-producto">🔍 Buscar producto</label>
+                  <div className="merma-product-search">
+                    <label className="merma-search-label" style={labelStyle} htmlFor="merma-buscar-producto">🔍 Buscar producto</label>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input
                         id="merma-buscar-producto"
@@ -1349,7 +1376,7 @@ export default function MermasContent() {
                           </div>
                         ) : productos.length > 0 ? (
                           productos.map(producto => (
-                            <div
+                            <button type="button" className="merma-search-result"
                               key={producto.CodigoBarras}
                               onClick={() => agregarProducto(producto)}
                               style={{
@@ -1365,7 +1392,7 @@ export default function MermasContent() {
                               onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                             >
                               <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 13, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                                   {producto.Producto}
                                 </div>
                                 <div style={{ fontSize: 11, color: '#718096', fontFamily: 'monospace', marginTop: 2 }}>
@@ -1375,7 +1402,7 @@ export default function MermasContent() {
                               <span style={{ background: '#38a169', color: 'white', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
                                 ➕ Agregar
                               </span>
-                            </div>
+                            </button>
                           ))
                         ) : searchTerm.length >= 2 ? (
                           <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>
@@ -1400,7 +1427,7 @@ export default function MermasContent() {
                           <div key={producto.CodigoBarras} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#fafafa' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
                               <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: 600, color: '#2d3748', fontSize: 13, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                                   {producto.Producto}
                                 </div>
                                 <div style={{ fontSize: 11, color: '#718096', fontFamily: 'monospace' }}>
@@ -1409,10 +1436,10 @@ export default function MermasContent() {
                               </div>
                               <button
                                 onClick={() => eliminarProducto(producto.CodigoBarras)}
-                                aria-label="Eliminar producto"
+                                aria-label={`Eliminar ${producto.Producto}`}
                                 style={{
                                   background: '#fff5f5', color: '#c53030', border: '1px solid #fc8181', borderRadius: 6,
-                                  padding: '6px 10px', cursor: 'pointer', fontSize: 14, flexShrink: 0, minHeight: 32
+                                  padding: '6px 10px', cursor: 'pointer', fontSize: 14, flexShrink: 0, minHeight: 44, minWidth: 44
                                 }}
                               >
                                 🗑
@@ -1424,6 +1451,8 @@ export default function MermasContent() {
                                 <label style={{ ...labelStyle, fontSize: 11 }}>Cantidad</label>
                                 <input
                                   type="number"
+                                  inputMode="numeric"
+                                  aria-label={`Cantidad de ${producto.Producto}`}
                                   value={producto.Cantidad}
                                   onChange={(e) => actualizarCantidad(producto.CodigoBarras, e.target.value)}
                                   min="1"
@@ -1454,7 +1483,7 @@ export default function MermasContent() {
                 </div>
 
                 {/* Footer Paso 2 */}
-                <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 12, justifyContent: 'space-between' }}>
+                <div className="merma-modal-footer" style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 12, justifyContent: 'space-between' }}>
                   <button
                     onClick={() => setCurrentStep(1)}
                     disabled={guardandoProductos}
@@ -1474,7 +1503,7 @@ export default function MermasContent() {
               </>
             )}
           </div>
-        </div>
+        </div>, document.body
       )}
 
       {/* Modal de escáner de código de barras */}
@@ -1486,13 +1515,13 @@ export default function MermasContent() {
       )}
 
       {/* Modal de Detalles de Merma */}
-      {showDetalleModal && (
-        <div style={modalOverlay}>
-          <div style={{ ...modalContent, maxWidth: 800 }} ref={detalleModalRef} role="dialog" aria-modal="true" aria-label="Detalle de merma" tabIndex={-1}>
+      {showDetalleModal && createPortal(
+        <div className="merma-modal-overlay" style={modalOverlay}>
+          <div className="merma-modal" style={{ ...modalContent, maxWidth: 800 }} ref={detalleModalRef} role="dialog" aria-modal="true" aria-label="Detalle de merma" tabIndex={-1}>
 
             {/* Header */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, color: '#2368b3', fontSize: 18, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div className="merma-modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#2368b3', fontSize: 18, fontWeight: 700, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                 📋 Detalle de Merma #{mermaDetalle?.idMaMe}
               </h3>
               <button
@@ -1505,7 +1534,7 @@ export default function MermasContent() {
             </div>
 
             {/* Body */}
-            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="merma-modal-body" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               {/* Información General de la Merma */}
               {mermaDetalle && (
@@ -1640,7 +1669,7 @@ export default function MermasContent() {
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                             <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontWeight: 700, color: '#2d3748', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontWeight: 700, color: '#2d3748', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                                 {producto.nombreProducto || 'Producto no encontrado'}
                               </div>
                               <div style={{ color: '#718096', fontFamily: 'monospace', fontSize: 12 }}>
@@ -1692,7 +1721,7 @@ export default function MermasContent() {
             </div>
 
             {/* Footer */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
+            <div className="merma-modal-footer" style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowDetalleModal(false)}
                 style={btnSecondary}
@@ -1701,7 +1730,7 @@ export default function MermasContent() {
               </button>
             </div>
           </div>
-        </div>
+        </div>, document.body
       )}
     </div>
   );
