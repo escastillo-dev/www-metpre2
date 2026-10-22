@@ -32,7 +32,7 @@ No hay actualización en segundo plano de las consultas vigentes.
 
 ## Listados y estadísticas
 
-`operationalCache.ts` conserva lecturas durante cinco minutos por usuario, API,
+`operationalCache.ts` conserva lecturas durante 120 minutos por usuario, API,
 módulo, filtros y página. Se aplica a Mermas, Próximos a Caducar, Recuperaciones,
 Productos consumidos, Aperturas/Cierres, Valores y el dashboard. Cada vista muestra
 su última fecha de actualización y un botón para forzar una consulta. El reloj de

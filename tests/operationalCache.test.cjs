@@ -34,7 +34,10 @@ test('ETag revalidation after expiry reuses body on 304 and renews freshness', a
   const { client, respond, calls, advance } = setup();
   respond(async () => ({ data: { estatus: 1, total: 42 }, status: 200, headers: { etag: '"v1"' } }));
   await client.operationalGet('/backend/mermas/sucursales/1');
-  advance(5 * 60 * 1000 + 1);
+  advance(119 * 60 * 1000);
+  await client.operationalGet('/backend/mermas/sucursales/1');
+  assert.equal(calls.length, 1);
+  advance(60 * 1000 + 1);
   respond(async (_, config) => {
     assert.equal(config.headers.get('If-None-Match'), '"v1"');
     assert.equal(config.validateStatus(304), true);

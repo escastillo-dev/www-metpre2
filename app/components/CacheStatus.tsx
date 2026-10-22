@@ -33,7 +33,7 @@ export default function CacheStatus({ domain, onRefresh }: Props) {
     finally { setBusy(false); }
   };
   return <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }}>
-    <span role="status" style={{ fontSize: 12, color: '#526178' }}>{error || (updatedAt ? `Actualizado: ${new Date(updatedAt).toLocaleString('es-MX')} · ${now - updatedAt >= OPERATIONAL_TTL_MS ? 'Datos guardados; actualiza para consultar cambios' : 'Datos vigentes (5 min)'}` : 'Sin consulta vigente. Actualiza para obtener datos recientes.')}</span>
+    <span role="status" style={{ fontSize: 12, color: '#526178' }}>{error || (updatedAt ? `Actualizado: ${new Date(updatedAt).toLocaleString('es-MX')} · ${now - updatedAt >= OPERATIONAL_TTL_MS ? 'Datos guardados; actualiza para consultar cambios' : 'Datos vigentes (120 min)'}` : 'Sin consulta vigente. Actualiza para obtener datos recientes.')}</span>
     <button type="button" onClick={update} disabled={busy} style={{ minHeight: 44, padding: '8px 14px', border: '1px solid #2368b3', color: '#2368b3', background: 'white', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}>{busy ? 'Actualizando…' : 'Actualizar'}</button>
   </div>;
 }

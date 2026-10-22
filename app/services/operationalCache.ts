@@ -3,7 +3,7 @@ import { getCached, peekCache, invalidateCachePrefix } from './apiCache';
 
 export type OperationalDomain = 'mermas' | 'caducidad' | 'recuperaciones' | 'consumidos' | 'aperturas' | 'valores' | 'dashboard';
 export const OPERATIONAL_EVENT = 'metpre-operational-cache';
-export const OPERATIONAL_TTL_MS = 5 * 60 * 1000;
+export const OPERATIONAL_TTL_MS = 120 * 60 * 1000;
 interface Snapshot { data: unknown; updatedAt: number; etag?: string; lastModified?: string; estatus: number }
 
 export function domainFor(url: string): OperationalDomain {
