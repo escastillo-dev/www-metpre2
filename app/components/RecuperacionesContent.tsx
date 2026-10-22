@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { getCachedProductSearch } from '../services/productCache';
 import '../styles/recuperaciones.css';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
@@ -174,15 +175,17 @@ export default function RecuperacionesContent() {
     if (tipoId === 1) {
       const params = form.idCentro ? `?idCentro=${form.idCentro}` : '?limit=100&offset=0';
       // Intentar disponibles, si falla usar listado general
-      axios.get(`${API_URL}/proveedores/disponibles${params}`, { headers: getHeaders() })
-        .then(res => {
-          const lista = res.data.items || res.data.proveedores || res.data.data || [];
+      getCached(`proveedores_disponibles:${params}`, async () =>
+        (await axios.get(`${API_URL}/proveedores/disponibles${params}`, { headers: getHeaders() })).data)
+        .then(data => {
+          const lista = data.items || data.proveedores || data.data || [];
           if (lista.length > 0) { setProveedores(lista); return; }
           throw new Error('empty');
         })
         .catch(() => {
-          axios.get(`${API_URL}/proveedores?limit=100&offset=0`, { headers: getHeaders() })
-            .then(r => setProveedores(r.data.items || r.data.proveedores || []))
+          getCached('proveedores:limit=100&offset=0', async () =>
+            (await axios.get(`${API_URL}/proveedores?limit=100&offset=0`, { headers: getHeaders() })).data)
+            .then(data => setProveedores(data.items || data.proveedores || []))
             .catch(() => {});
         });
     }
@@ -198,10 +201,10 @@ export default function RecuperacionesContent() {
     setFilas(prev => prev.map(f => f.id === filaId ? { ...f, loadingSearch: true } : f));
     searchTimeouts.current![filaId] = setTimeout(async () => {
       try {
-        const res = await axios.get(`${API_URL}/productos/buscar?q=${encodeURIComponent(q)}`, { headers: getHeaders() });
+        const res = await getCachedProductSearch(q);
         const lista: ProductoBusqueda[] = res.data.estatus === 1
           ? (res.data.productos || [])
-          : (res.data.items || res.data || []);
+          : (res.data.items || []);
         setFilas(prev => prev.map(f => f.id === filaId ? { ...f, sugerencias: lista, loadingSearch: false } : f));
       } catch {
         setFilas(prev => prev.map(f => f.id === filaId ? { ...f, loadingSearch: false } : f));

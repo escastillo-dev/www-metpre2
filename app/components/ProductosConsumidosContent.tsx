@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { getCachedProductSearch } from '../services/productCache';
 import '../styles/productos-consumidos.css';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
@@ -119,7 +120,7 @@ export default function ProductosConsumidosContent() {
     setLoadingProductos(true);
     searchTimeout.current = setTimeout(async () => {
       try {
-        const res = await axios.get(`${API_URL}/productos/buscar?q=${encodeURIComponent(q)}`, { headers: getHeaders() });
+        const res = await getCachedProductSearch(q);
         if (res.data.estatus === 1) setSugerencias(res.data.productos || []);
       } catch {
         // ignorar

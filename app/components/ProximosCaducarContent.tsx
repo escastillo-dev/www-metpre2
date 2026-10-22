@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { getCachedProductSearch } from '../services/productCache';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
 import BarcodeScannerModal from './BarcodeScannerModal';
@@ -206,7 +207,7 @@ export default function ProximosCaducarContent() {
         if (codigosUnicos.length > 0) {
           const resultados = await Promise.allSettled(
             codigosUnicos.map(cb =>
-              axios.get(`${API_URL}/productos/buscar?q=${encodeURIComponent(cb)}`, { headers: getHeaders() })
+              getCachedProductSearch(cb)
             )
           );
           const mapaProductos: Record<string, string> = {};
@@ -259,7 +260,7 @@ export default function ProximosCaducarContent() {
     setLoadingProductos(true);
     const t = setTimeout(async () => {
       try {
-        const res = await axios.get(`${API_URL}/productos/buscar?q=${encodeURIComponent(termino)}`, { headers: getHeaders() });
+        const res = await getCachedProductSearch(termino);
         if (res.data.estatus === 1) setProductosSugerencias(res.data.productos || []);
       } catch (e) { console.error('Error buscando productos:', e); }
       finally { setLoadingProductos(false); }
@@ -338,8 +339,8 @@ export default function ProximosCaducarContent() {
       // Si no trae nombre, buscarlo por código de barras
       if (!normalized.nombreProducto && normalized.codigoBarras) {
         try {
-          const pr = await axios.get(`${API_URL}/productos/buscar?q=${encodeURIComponent(normalized.codigoBarras)}`, { headers: getHeaders() });
-          if (pr.data.estatus === 1 && pr.data.productos?.length > 0) {
+          const pr = await getCachedProductSearch(normalized.codigoBarras);
+          if (pr.data.estatus === 1 && pr.data.productos && pr.data.productos.length > 0) {
             const p = pr.data.productos.find((x: Record<string, unknown>) => (x.CodigoBarras ?? x.codigoBarras) === normalized.codigoBarras) || pr.data.productos[0];
             normalized.nombreProducto = (p.Producto ?? p.nombre ?? p.Descripcion ?? '') as string;
           }

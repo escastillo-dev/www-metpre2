@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import axios from 'axios';
 import { getCached } from '../services/apiCache';
+import AuthService from '../services/AuthService';
 import './dashboard.css';
 import AssignSucursalModal from '../components/AssignSucursalModal';
 import EditUserModal from '../components/EditUserModal';
@@ -482,12 +483,7 @@ function DashboardContent() {
               className="nav-item nav-item-logout"
               onClick={() => {
                 if (!window.confirm('¿Seguro que deseas cerrar sesión?')) return;
-                localStorage.removeItem('authToken');
-                localStorage.removeItem('userCredentials');
-                localStorage.removeItem('userId');
-                localStorage.removeItem('userName');
-                localStorage.removeItem('userLevel');
-                localStorage.removeItem('idNivelUsuario');
+                AuthService.logout();
                 router.replace('/login');
               }}
             >

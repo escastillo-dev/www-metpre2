@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import AperturaCierreModal from './AperturaCierreModal';
 import { getConReintentos } from '../services/httpRetry';
+import { getCached } from '../services/apiCache';
 
 // URL de la API — configurar NEXT_PUBLIC_API_URL en .env.local (vacío = proxy /backend)
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
@@ -296,21 +297,24 @@ export default function AperturaCierresContent() {
         return;
       }
 
-      const response = await getConReintentos<UsuarioResponse>(() => axios.get<UsuarioResponse>(`${API_URL}/usuarios/${userId}`, {
-        headers: {
-          'Authorization': `Basic ${userCredentials}`,
-          'Content-Type': 'application/json'
-        }
-      }));
+      const data = await getCached(`sucursales_${userId}`, async () => {
+        const response = await getConReintentos<UsuarioResponse>(() => axios.get<UsuarioResponse>(`${API_URL}/usuarios/${userId}`, {
+          headers: {
+            'Authorization': `Basic ${userCredentials}`,
+            'Content-Type': 'application/json'
+          }
+        }));
+        return response.data;
+      });
 
-      if (response.data.estatus === 1) {
-        if (response.data.sucursales && Array.isArray(response.data.sucursales)) {
-          setSucursalesAsignadas(response.data.sucursales);
+      if (data.estatus === 1) {
+        if (data.sucursales && Array.isArray(data.sucursales)) {
+          setSucursalesAsignadas(data.sucursales);
         } else {
-          console.error('No se encontraron sucursales asignadas:', response.data);
+          console.error('No se encontraron sucursales asignadas:', data);
         }
       } else {
-        console.error('Error en la respuesta:', response.data.mensaje);
+        console.error('Error en la respuesta:', data.mensaje);
       }
     } catch (error) {
       console.error('Error al obtener sucursales asignadas (tras reintentos):', error);

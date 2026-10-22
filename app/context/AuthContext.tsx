@@ -2,6 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import { clearPersistentCache } from '../services/apiCache';
 import axios from 'axios';
 import AuthService, { UserData, Sucursal } from '../services/AuthService';
 
@@ -135,6 +136,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       // Guardar credenciales
+      if (localStorage.getItem('userId') !== userId) await clearPersistentCache();
       localStorage.setItem('userCredentials', credentials);
       localStorage.setItem('userId', userId);
 

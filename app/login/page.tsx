@@ -2,6 +2,7 @@
 import "../style.css";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { clearPersistentCache, invalidateCache } from '../services/apiCache';
 
 const MAX_INTENTOS = 5;
 const BLOQUEO_MS = 60_000; // 1 minuto
@@ -116,12 +117,15 @@ function LoginForm() {
       const nivelUsuario = nivelInfo ? nivelInfo.NivelUsuario : 'Usuario';
 
       // 3. Guardar sesión
+      if (localStorage.getItem('userId') !== nomina) await clearPersistentCache();
       localStorage.setItem("userCredentials", credentials);
       localStorage.setItem("userName",        userName);
       localStorage.setItem("idNivelUsuario",  idNivelUsuario.toString());
       localStorage.setItem("userLevel",       nivelUsuario);
       localStorage.setItem("authToken",       token);
       localStorage.setItem("userId",          nomina);
+      await invalidateCache(`sucursales_${nomina}`);
+      await invalidateCache('niveles_usuario');
 
       window.location.href = "/dashboard";
 

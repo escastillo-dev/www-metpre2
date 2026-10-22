@@ -1,5 +1,6 @@
 // Servicio de Autenticación
 import BaseApiService from './BaseApiService';
+import { clearPersistentCache, invalidateCache, getCached } from './apiCache';
 
 export interface UserData {
   idUsuarios: number;
@@ -23,7 +24,12 @@ export interface AuthResponse {
 
 class AuthService extends BaseApiService {
   async getCurrentUser(userId: string) {
-    return this.get<AuthResponse>(`/usuarios/${userId}`);
+    const result = await this.get<AuthResponse>(`/usuarios/${userId}`);
+    if (result.success && result.data?.estatus === 1) {
+      await invalidateCache(`sucursales_${userId}`);
+      await getCached(`sucursales_${userId}`, async () => result.data);
+    }
+    return result;
   }
 
   async validateCredentials() {
@@ -41,6 +47,7 @@ class AuthService extends BaseApiService {
   }
 
   logout() {
+    void clearPersistentCache();
     localStorage.removeItem('userCredentials');
     localStorage.removeItem('userId');
     localStorage.removeItem('userLevel');

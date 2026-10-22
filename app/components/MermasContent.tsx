@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { getCachedProductSearch } from '../services/productCache';
 import { createPortal } from 'react-dom';
 import '../styles/mermas-modal.css';
 import { getConReintentos } from '../services/httpRetry';
@@ -356,12 +357,7 @@ export default function MermasContent() {
       const userCredentials = localStorage.getItem('userCredentials');
       if (!userCredentials) return;
 
-      const response = await axios.get(`${API_URL}/productos/buscar?q=${encodeURIComponent(termino)}`, {
-        headers: {
-          'Authorization': `Basic ${userCredentials}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await getCachedProductSearch(termino);
 
       if (response.data.estatus === 1) {
         setProductos(response.data.productos || []);
