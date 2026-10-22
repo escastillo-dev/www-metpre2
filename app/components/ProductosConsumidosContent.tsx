@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { operationalGet, invalidateOperational } from '../services/operationalCache';
+import CacheStatus from './CacheStatus';
 import { getCachedProductSearch } from '../services/productCache';
 import '../styles/productos-consumidos.css';
 import { getConReintentos } from '../services/httpRetry';
@@ -171,6 +173,7 @@ export default function ProductosConsumidosContent() {
       };
       const res = await axios.post(`${API_URL}/productos-consumidos`, body, { headers: getHeaders() });
       if (res.data.estatus === 1) {
+        await invalidateOperational(['consumidos']);
         setFolioGenerado(res.data.Folio);
         showNotif('ok', res.data.mensaje || 'Producto marcado correctamente');
         if (activeTab === 'listado') fetchListado();
@@ -219,7 +222,7 @@ export default function ProductosConsumidosContent() {
       if (filtroCentro) params.idCentro = filtroCentro;
       if (filtroColaborador) params.idColaborador = filtroColaborador;
       if (filtroQ) params.q = filtroQ;
-      const res = await axios.get(`${API_URL}/productos-consumidos`, { headers: getHeaders(), params });
+      const res = await operationalGet(`${API_URL}/productos-consumidos`, { headers: getHeaders(), params });
       if (res.data.estatus === 1) {
         setItems(res.data.items || []);
         setTotal(res.data.total ?? 0);
@@ -241,6 +244,7 @@ export default function ProductosConsumidosContent() {
 
   return (
     <div className="productos-consumidos" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <CacheStatus domain="consumidos" onRefresh={fetchListado} />
       {notif && (
         <div style={{
           padding: '12px 16px', borderRadius: 8, fontSize: 14, fontWeight: 500,

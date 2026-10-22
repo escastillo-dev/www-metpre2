@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
+import { operationalGet, invalidateOperational } from '../services/operationalCache';
+import CacheStatus from './CacheStatus';
 import AperturaCierreModal from './AperturaCierreModal';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
@@ -184,6 +186,7 @@ export default function AperturaCierresContent() {
 
       if (response.data && response.data.estatus === 1) {
         alert(`✅ ${response.data.mensaje || `${modalData.tipo === 'apertura' ? 'Apertura' : 'Cierre'} registrado correctamente`}`);
+        await invalidateOperational(['aperturas']);
         await fetchRegistrosApci(); // Recargar los registros
         setStatsKey(prev => prev + 1); // Actualizar estadísticas
         
@@ -227,7 +230,7 @@ export default function AperturaCierresContent() {
       // Construir URL con filtro de sucursales
       const sucursalesIds = sucursalesAsignadas.map(s => s.idCentro).join(',');
       
-      const response = await axios.get(`${API_URL}/apci/consultar`, {
+      const response = await operationalGet(`${API_URL}/apci/consultar`, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Basic ${userCredentials}`,
@@ -470,6 +473,7 @@ export default function AperturaCierresContent() {
 
       if (response.data.estatus === 1) {
         alert(`✅ ${response.data.mensaje}`);
+        await invalidateOperational(['aperturas']);
         await fetchRegistrosApci();
         clearForm();
       } else {
@@ -548,6 +552,7 @@ export default function AperturaCierresContent() {
 
   return (
   <div className="p-5">
+      <CacheStatus domain="aperturas" onRefresh={fetchRegistrosApci} />
       
       {/* Stats Grid */}
         <div className="stats-grid">

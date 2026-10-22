@@ -9,6 +9,9 @@ const DB_NAME = 'metpre-read-cache-v1';
 const memoryCache = new Map<string, CacheEntry<unknown>>();
 const inFlight = new Map<string, Promise<unknown>>();
 let generation = 0;
+const revisions = new Map<string, number>();
+let revisionCounter = 0;
+const revisionFor = (key: string) => Math.max(0, ...Array.from(revisions).filter(([prefix]) => key.startsWith(prefix)).map(([, value]) => value));
 let database: Promise<IDBDatabase | null> | undefined;
 let storageQueue: Promise<unknown> = Promise.resolve();
 
@@ -104,9 +107,10 @@ export function getCached<T>(key: string, fetcher: () => Promise<T>, ttlMs?: num
   if (!fullKey) return fetcher();
   const ttl = ttlMs ?? (/^(sucursales_|niveles_usuario)/.test(key) ? ACCESS_TTL_MS : CATALOG_TTL_MS);
   const version = generation;
+  const revision = revisionFor(fullKey);
   const existing = inFlight.get(fullKey);
   if (existing) return existing as Promise<T>;
-  const stillCurrent = () => version === generation && scopedKey(key) === fullKey;
+  const stillCurrent = () => version === generation && revisionFor(fullKey) === revision && scopedKey(key) === fullKey;
   const fresh = (entry?: CacheEntry<unknown>) => entry && Date.now() - entry.timestamp < ttl;
   const operation = (async () => {
     const memory = memoryCache.get(fullKey);
@@ -137,15 +141,42 @@ export function getCached<T>(key: string, fetcher: () => Promise<T>, ttlMs?: num
 export async function invalidateCache(key: string): Promise<void> {
   const fullKey = scopedKey(key);
   if (!fullKey) return;
-  generation++;
+  revisions.set(fullKey, ++revisionCounter);
   memoryCache.delete(fullKey);
-  inFlight.clear();
+  inFlight.delete(fullKey);
   await storageOperation(undefined, store => { store.delete(fullKey); });
+}
+
+/** Lee metadatos, incluso vencidos, para validación condicional; no hace solicitudes. */
+export async function peekCache<T>(key: string): Promise<T | undefined> {
+  const fullKey = scopedKey(key);
+  if (!fullKey) return undefined;
+  const entry = memoryCache.get(fullKey) ?? await readStored(fullKey);
+  return entry?.data as T | undefined;
+}
+
+/** Elimina todas las variantes de filtros/páginas de un módulo, sin tocar otros. */
+export async function invalidateCachePrefix(prefix: string): Promise<void> {
+  const fullPrefix = scopedKey(prefix);
+  if (!fullPrefix) return;
+  revisions.set(fullPrefix, ++revisionCounter);
+  for (const key of memoryCache.keys()) if (key.startsWith(fullPrefix)) memoryCache.delete(key);
+  for (const key of inFlight.keys()) if (key.startsWith(fullPrefix)) inFlight.delete(key);
+  await storageOperation(undefined, store => {
+    const request = store.openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      if (String(cursor.key).startsWith(fullPrefix)) cursor.delete();
+      cursor.continue();
+    };
+  });
 }
 
 /** Limpiar antes de retirar las credenciales al cerrar sesión o cambiar de cuenta. */
 export async function clearPersistentCache(): Promise<void> {
   generation++;
+  revisions.clear();
   memoryCache.clear();
   inFlight.clear();
   await storageOperation(undefined, store => { store.clear(); });

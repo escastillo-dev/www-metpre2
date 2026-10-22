@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { operationalGet, invalidateOperational } from '../services/operationalCache';
+import CacheStatus from './CacheStatus';
 import { getCachedProductSearch } from '../services/productCache';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
@@ -119,6 +121,8 @@ export default function ProximosCaducarContent() {
   const [filtroEstatus, setFiltroEstatus]   = useState<'A' | 'C'>('A');
   const [filtroSucursal, setFiltroSucursal] = useState('');
   const [filtroBusqueda, setFiltroBusqueda] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [totalRegistros, setTotalRegistros] = useState<number | null>(null);
   const [sucursalesAsignadas, setSucursalesAsignadas] = useState<Sucursal[]>([]);
 
   const [casoDetalle, setCasoDetalle]           = useState<CaducidadRegistro | null>(null);
@@ -176,12 +180,17 @@ export default function ProximosCaducarContent() {
   const fetchRegistros = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { estatus: filtroEstatus, limit: '50', offset: '0' };
+      const params: Record<string, string> = { estatus: filtroEstatus, limit: '50', offset: String(offset) };
       if (filtroSucursal) params.idCentro = filtroSucursal;
       if (filtroBusqueda) params.q = filtroBusqueda;
       const headers = getHeaders();
-      const res = await axios.get(`${API_URL}/caducidad/registros`, { headers, params });
+      const res = await operationalGet(`${API_URL}/caducidad/registros`, { headers, params });
       if (res.data.estatus === 1) {
+        const total = Number(res.data.total);
+        setTotalRegistros(res.data.total != null && Number.isFinite(total) ? total : null);
+        if (res.data.total != null && Number.isFinite(total) && offset > 0 && offset >= total) {
+          setOffset(total > 0 ? Math.floor((total - 1) / 50) * 50 : 0);
+        }
         const raw = res.data.items || res.data.registros || [];
         const normalized = raw.map((r: Record<string, unknown>) => ({
           idCad:             r.idCad             ?? r.IdCad,
@@ -233,11 +242,11 @@ export default function ProximosCaducarContent() {
       }
     } catch (e) { console.error('[Caducidad] Error al obtener registros:', e); setRegistros([]); }
     finally { setLoading(false); }
-  }, [filtroEstatus, filtroSucursal, filtroBusqueda, refreshKey]);
+  }, [filtroEstatus, filtroSucursal, filtroBusqueda, refreshKey, offset]);
 
   const fetchTotalCerrados = useCallback(async () => {
     try {
-      const res = await axios.get(`${API_URL}/caducidad/registros`, {
+      const res = await operationalGet(`${API_URL}/caducidad/registros`, {
         headers: getHeaders(),
         params: { estatus: 'C', limit: '1', offset: '0' },
       });
@@ -306,6 +315,7 @@ export default function ProximosCaducarContent() {
       }, { headers: getHeaders() });
       if (res.data.estatus === 1) {
         showNotif('ok', 'Caso registrado correctamente.');
+        await invalidateOperational(['caducidad', 'dashboard']);
         setShowNuevoModal(false); resetNuevoForm(); setRefreshKey(k => k + 1);
       } else { showNotif('error', res.data.mensaje || 'Error al registrar.'); }
     } catch (e) { showNotif('error', 'Error de conexión.'); }
@@ -315,7 +325,7 @@ export default function ProximosCaducarContent() {
   const handleVerDetalle = async (idCad: number) => {
     setLoadingDetalle(true); setShowDetalleModal(true); setCasoDetalle(null); setAcciones([]);
     try {
-      const res = await axios.get(`${API_URL}/caducidad/registros/${idCad}`, { headers: getHeaders() });
+      const res = await operationalGet(`${API_URL}/caducidad/registros/${idCad}`, { headers: getHeaders() });
       // Estructura: res.data.data.registro + res.data.data.acciones + res.data.data.cierre
       const envelope = res.data.data ?? res.data;
       const raw = envelope.registro ?? envelope;
@@ -381,6 +391,7 @@ export default function ProximosCaducarContent() {
         const idCadActual = casoDetalle.idCad;
         const ahora = new Date().toLocaleString('es-MX');
         showNotif('ok', 'Acción registrada.');
+        await invalidateOperational(['caducidad', 'dashboard']);
         setShowAccionModal(false);
         setAccionForm({ idTipoAccion: 6, cantidad: '', resultado: 'EN_PROCESO', comentario: '' });
         // Actualizar ultimaAccion en la tabla sin recargar todo
@@ -455,6 +466,7 @@ export default function ProximosCaducarContent() {
               setGuardandoCierre(false); return;
             }
             mermasPendientesRef.current[casoDetalle.idCad] = { idMerma, cantidad: cantidadMerma, productoGuardado: false };
+            await invalidateOperational(['mermas', 'dashboard']);
           }
 
           // 2. Agregar el producto a la merma (idMotMer=1 = Caducidad/genérico)
@@ -467,6 +479,7 @@ export default function ProximosCaducarContent() {
               }, { headers: getHeaders() });
               if (productoRes.data?.estatus !== 1) throw new Error('El producto no fue registrado.');
               mermasPendientesRef.current[casoDetalle.idCad].productoGuardado = true;
+              await invalidateOperational(['mermas', 'dashboard']);
             } catch (e) {
               console.error('Error al agregar producto a merma:', e);
               showNotif('error', `No se pudo guardar el producto en la merma #${idMerma}. El caso sigue abierto.`);
@@ -485,6 +498,7 @@ export default function ProximosCaducarContent() {
       // Registrar el cierre del caso
       const res = await axios.post(`${API_URL}/caducidad/registros/${casoDetalle.idCad}/cierre`, body, { headers: getHeaders() });
       if (res.data.estatus === 1) {
+        await invalidateOperational(['caducidad', 'dashboard']);
         delete mermasPendientesRef.current[casoDetalle.idCad];
         showNotif('ok', registrarMerma
           ? `✅ Caso cerrado y merma registrada (ID: ${body.idMerma}).`
@@ -504,6 +518,7 @@ export default function ProximosCaducarContent() {
 
   return (
     <div style={{ padding: '20px', background: '#f8fafc', minHeight: '100%' }}>
+      <CacheStatus domain="caducidad" onRefresh={async () => { await Promise.all([fetchRegistros(), fetchTotalCerrados()]); }} />
 
       {notif && (
         <div style={{
@@ -545,21 +560,21 @@ export default function ProximosCaducarContent() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, alignItems: 'flex-end' }}>
             <div>
               <label style={labelStyle}>Estatus</label>
-              <select value={filtroEstatus} onChange={e => setFiltroEstatus(e.target.value as 'A' | 'C')} style={inputStyle}>
+              <select value={filtroEstatus} onChange={e => { setOffset(0); setFiltroEstatus(e.target.value as 'A' | 'C'); }} style={inputStyle}>
                 <option value="A">Abiertos</option>
                 <option value="C">Cerrados</option>
               </select>
             </div>
             <div>
               <label style={labelStyle}>Sucursal</label>
-              <select value={filtroSucursal} onChange={e => setFiltroSucursal(e.target.value)} style={inputStyle}>
+              <select value={filtroSucursal} onChange={e => { setOffset(0); setFiltroSucursal(e.target.value); }} style={inputStyle}>
                 <option value="">Todas las sucursales</option>
                 {sucursalesAsignadas.map(s => <option key={s.idCentro} value={s.idCentro}>{s.Sucursal}</option>)}
               </select>
             </div>
             <div>
               <label style={labelStyle}>Buscar producto</label>
-              <input type="text" placeholder="Codigo o nombre..." value={filtroBusqueda} onChange={e => setFiltroBusqueda(e.target.value)} style={inputStyle} />
+              <input type="text" placeholder="Codigo o nombre..." value={filtroBusqueda} onChange={e => { setOffset(0); setFiltroBusqueda(e.target.value); }} style={inputStyle} />
             </div>
             <div>
               <button onClick={fetchRegistros} style={{ ...btnPrimary, width: '100%' }}> Buscar</button>
@@ -723,6 +738,14 @@ export default function ProximosCaducarContent() {
           </div>
         )}
       </div>
+
+      <nav aria-label="Páginas de casos" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+        <span style={{ fontSize: 13, color: '#526178' }}>Mostrando {registros.length ? offset + 1 : 0}–{offset + registros.length}{totalRegistros !== null ? ` de ${totalRegistros}` : ''}</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" style={btnSecondary} disabled={loading || offset === 0} onClick={() => setOffset(Math.max(0, offset - 50))}>Anterior</button>
+          <button type="button" style={btnSecondary} disabled={loading || (totalRegistros !== null ? offset + 50 >= totalRegistros : registros.length < 50)} onClick={() => setOffset(offset + 50)}>Siguiente</button>
+        </div>
+      </nav>
 
       {/* MODAL: Nuevo registro */}
       {showNuevoModal && (

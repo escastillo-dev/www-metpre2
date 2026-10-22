@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { operationalGet, invalidateOperational } from '../services/operationalCache';
+import CacheStatus from './CacheStatus';
 import { useAuth } from '../context';
 import ValoresTable from './ValoresTable';
 import ValoresModal from './ValoresModal';
@@ -183,6 +185,7 @@ export default function ValoresContent() {
 
       if (response.data.estatus === 1) {
         alert(response.data.mensaje);
+        await invalidateOperational(['valores', 'dashboard']);
         setShowModal(false);
         // Limpiar el formulario
         setFormData({
@@ -288,7 +291,7 @@ export default function ValoresContent() {
       // La API solo admite un idCentro por solicitud. Consultar cada sucursal
       // asignada evita la búsqueda global que provocaba esperas prolongadas.
       const responses = await Promise.all(
-        centros.map(idCentro => axios.get<MovimientosResponse>(`${API_URL}/mmv/movimientos`, {
+        centros.map(idCentro => operationalGet<MovimientosResponse>(`${API_URL}/mmv/movimientos`, {
           params: {
             idCentro,
             limit,
@@ -353,6 +356,7 @@ export default function ValoresContent() {
 
   return (
     <div style={{ padding: '20px' }} className="px-3 py-4 sm:px-5 sm:py-5">
+      <CacheStatus domain="valores" onRefresh={fetchMovimientos} />
       {error && <div style={{ marginBottom: 12, color: '#c53030' }}>Error: {error}</div>}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3" style={{ marginBottom: '20px' }}>
         <h1 className="text-xl sm:text-2xl" style={{ margin: 0 }}>Manejo de Valores</h1>

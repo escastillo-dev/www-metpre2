@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { operationalGet } from '../services/operationalCache';
+import CacheStatus from './CacheStatus';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { getConReintentos } from '../services/httpRetry';
@@ -227,7 +229,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = () => {
     setLoadingResumen(true);
     setErrorResumen(null);
     try {
-      const res = await axios.get(`${API_URL}/dashboard/resumen`, {
+      const res = await operationalGet(`${API_URL}/dashboard/resumen`, {
         headers: getHeaders(),
         params: buildParams(f),
       });
@@ -251,7 +253,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = () => {
     setLoadingGraficas(true);
     setErrorGraficas(null);
     try {
-      const res = await axios.get(`${API_URL}/dashboard/graficas`, {
+      const res = await operationalGet(`${API_URL}/dashboard/graficas`, {
         headers: getHeaders(),
         params: buildParams(f),
       });
@@ -456,6 +458,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = () => {
 
   return (
     <div className="dashboard-overview w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <CacheStatus domain="dashboard" onRefresh={handleAplicarFiltros} />
 
       {/* --- Filtros --- */}
       <div style={{ ...cardStyle, minWidth: 0 }}>

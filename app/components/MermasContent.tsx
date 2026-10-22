@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { operationalGet, invalidateOperational } from '../services/operationalCache';
+import CacheStatus from './CacheStatus';
 import { getCachedProductSearch } from '../services/productCache';
 import { createPortal } from 'react-dom';
 import '../styles/mermas-modal.css';
@@ -24,6 +26,7 @@ interface Merma {
   nombreSucursal?: string;
   nombreUsuario?: string;
   nombreAnfitrion?: string;
+  totalPerdida?: number;
 }
 
 interface Sucursal {
@@ -31,8 +34,19 @@ interface Sucursal {
   Sucursal: string;
 }
 
+interface ResumenMermas {
+  totalRegistros: number;
+  totalImporte: number;
+  mermasHoy: number;
+  mermasMes: number;
+  mermasUltimos30Dias: number;
+}
+
 export default function MermasContent() {
   const [records, setRecords] = useState<Merma[]>([]);
+  const [resumenServidor, setResumenServidor] = useState<ResumenMermas | null>(null);
+  const [pageOffset, setPageOffset] = useState(0);
+  const recordsRequestRef = useRef(0);
   const [loading, setLoading] = useState(false);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [sucursalesAsignadas, setSucursalesAsignadas] = useState<Sucursal[]>([]);
@@ -145,6 +159,7 @@ export default function MermasContent() {
 
   // Función para obtener los registros de mermas
   const fetchRegistrosMermas = async () => {
+    const requestId = ++recordsRequestRef.current;
     setLoadingRecords(true);
     try {
       const userCredentials = localStorage.getItem('userCredentials');
@@ -157,6 +172,7 @@ export default function MermasContent() {
       // Verificar que tenemos sucursales asignadas
       if (sucursalesAsignadas.length === 0) {
         setRecords([]);
+        setResumenServidor(null);
         setLoadingRecords(false);
         return;
       }
@@ -167,14 +183,32 @@ export default function MermasContent() {
       const url = `${API_URL}/mermas/sucursales/${sucursalesIds}`;
       
       // Llamar a la API real de mermas
-      const response = await axios.get(url, {
+      const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const today = new Date();
+      const starts = [filtroFechaInicio];
+      const ends = [filtroFechaFin];
+      if (filter === 'hoy') { starts.push(localDate(today)); ends.push(localDate(today)); }
+      if (filter === 'mes') {
+        starts.push(localDate(new Date(today.getFullYear(), today.getMonth(), 1)));
+        ends.push(localDate(new Date(today.getFullYear(), today.getMonth() + 1, 0)));
+      }
+      const fechaInicio = starts.filter(Boolean).sort().slice(-1)[0];
+      const fechaFin = ends.filter(Boolean).sort()[0];
+      const response = await operationalGet(url, {
+        params: { limit: 20, offset: pageOffset, fecha_inicio: fechaInicio, fecha_fin: fechaFin },
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
         }
       });
 
+      if (requestId !== recordsRequestRef.current) return;
       if (response.data.estatus === 1) {
+        setResumenServidor(response.data.resumen ?? null);
+        const total = Number(response.data.total);
+        if (response.data.resumen && pageOffset > 0 && Number.isFinite(total) && pageOffset >= total) {
+          setPageOffset(total > 0 ? Math.floor((total - 1) / 20) * 20 : 0);
+        }
         // Mapear los datos de la API al formato esperado por el frontend
         const mermasFormateadas = (response.data.mermas || []).map((merma: any) => {
           return {
@@ -186,6 +220,8 @@ export default function MermasContent() {
             motivo: 'Múltiples motivos', // Las mermas pueden tener múltiples productos con diferentes motivos
             nombreSucursal: merma.nombreSucursal || 'Sucursal no encontrada',
             nombreUsuario: merma.nombreUsuario || 'Usuario no encontrado',
+            totalPerdida: merma.totalMerma != null || merma.TotalMerma != null
+              ? Number(merma.totalMerma ?? merma.TotalMerma) : undefined,
             nombreAnfitrion: `Nómina: ${merma.Anfitrion}` // Mostrar el número de nómina
           };
         });
@@ -194,68 +230,25 @@ export default function MermasContent() {
       } else {
         console.error('Error en la respuesta de mermas:', response.data.mensaje);
         setRecords([]);
+        setResumenServidor(null);
       }
     } catch (error) {
       console.error('Error al obtener registros de mermas:', error);
+      if (requestId !== recordsRequestRef.current) return;
       setRecords([]);
+      setResumenServidor(null);
     } finally {
-      setLoadingRecords(false);
+      if (requestId === recordsRequestRef.current) setLoadingRecords(false);
     }
   };
 
   // Función para calcular el total de pérdidas en dinero
-  const calcularTotalPerdidas = async () => {
-    setLoadingTotalPerdidas(true);
-    try {
-      const userCredentials = localStorage.getItem('userCredentials');
-      if (!userCredentials || records.length === 0) {
-        setTotalPerdidasDinero(0);
-        setLoadingTotalPerdidas(false);
-        return;
-      }
-
-      let totalPerdidas = 0;
-      
-      // Para cada merma, obtener sus productos y calcular el valor
-      for (const merma of records) {
-        try {
-          const response = await axios.get(`${API_URL}/mermas/${merma.idMaMe}/productos`, {
-            headers: {
-              'Authorization': `Basic ${userCredentials}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          if (response.data.estatus === 1) {
-            const productos = response.data.productos || [];
-            
-            // Calcular el valor de pérdida para esta merma
-            const valorMerma = productos.reduce((suma: number, producto: any) => {
-              // El API devuelve el campo "Precio" (con P mayúscula)
-              const cantidad = parseFloat(producto.Cantidad) || 0;
-              const precio = parseFloat(producto.Precio || 0);
-              const valorProducto = cantidad * precio;
-              return suma + valorProducto;
-            }, 0);
-
-            totalPerdidas += valorMerma;
-          }
-        } catch (error) {
-          console.error(`Error al obtener productos de merma ${merma.idMaMe}:`, error);
-        }
-      }
-
-      setTotalPerdidasDinero(totalPerdidas);
-    } catch (error) {
-      console.error('Error al calcular total de pérdidas:', error);
-      setTotalPerdidasDinero(0);
-    } finally {
-      setLoadingTotalPerdidas(false);
-    }
-  };
-
-  // Función para calcular pérdidas considerando filtros de fecha
   const calcularTotalPerdidasFiltradas = async () => {
+    if (resumenServidor) {
+      setTotalPerdidasDinero(Number(resumenServidor.totalImporte) || 0);
+      setLoadingTotalPerdidas(false);
+      return;
+    }
     setLoadingTotalPerdidas(true);
     try {
       const userCredentials = localStorage.getItem('userCredentials');
@@ -279,7 +272,11 @@ export default function MermasContent() {
       // Para cada merma filtrada, obtener sus productos y calcular el valor
       for (const merma of recordsFiltrados) {
         try {
-          const response = await axios.get(`${API_URL}/mermas/${merma.idMaMe}/productos`, {
+          if (merma.totalPerdida !== undefined && Number.isFinite(merma.totalPerdida)) {
+            totalPerdidas += merma.totalPerdida;
+            continue;
+          }
+          const response = await operationalGet(`${API_URL}/mermas/${merma.idMaMe}/productos`, {
             headers: {
               'Authorization': `Basic ${userCredentials}`,
               'Content-Type': 'application/json'
@@ -506,6 +503,7 @@ export default function MermasContent() {
           }
         }
         
+        await invalidateOperational(['mermas', 'dashboard']);
         setMermaCreada({ 
           idMaMe: mermaId, 
           ...response.data.merma 
@@ -569,12 +567,14 @@ export default function MermasContent() {
           idMotMer: parseInt(producto.idMotMer || nuevaMerma.motivoGeneral || '1') // Usar motivo del producto o motivo general
         };
 
-        await axios.post(`${API_URL}/mermas/${mermaCreada.idMaMe}/productos`, productoData, {
+        const productoResponse = await axios.post(`${API_URL}/mermas/${mermaCreada.idMaMe}/productos`, productoData, {
           headers: {
             'Authorization': `Basic ${userCredentials}`,
             'Content-Type': 'application/json'
           }
         });
+        if (productoResponse.data.estatus !== 1) throw new Error(productoResponse.data.mensaje || 'No se pudo guardar el producto.');
+        await invalidateOperational(['mermas', 'dashboard']);
       }
 
       alert('Merma registrada exitosamente con productos');
@@ -619,7 +619,7 @@ export default function MermasContent() {
     if (sucursalesAsignadas.length > 0) {
       fetchRegistrosMermas();
     }
-  }, [sucursalesAsignadas]);
+  }, [sucursalesAsignadas, pageOffset, filtroFechaInicio, filtroFechaFin, filter]);
 
   // Calcular total de pérdidas cuando cambian los registros o filtros
   useEffect(() => {
@@ -628,7 +628,7 @@ export default function MermasContent() {
     } else {
       setTotalPerdidasDinero(0);
     }
-  }, [records, filtroFechaInicio, filtroFechaFin, filter]);
+  }, [records, filtroFechaInicio, filtroFechaFin, filter, resumenServidor]);
 
   // Verificar alertas cuando cambian las pérdidas
   useEffect(() => {
@@ -659,7 +659,7 @@ export default function MermasContent() {
       setMermaDetalle(mermaInfo);
 
       // Obtener productos de la merma
-      const response = await axios.get(`${API_URL}/mermas/${mermaId}/productos`, {
+      const response = await operationalGet(`${API_URL}/mermas/${mermaId}/productos`, {
         headers: {
           'Authorization': `Basic ${userCredentials}`,
           'Content-Type': 'application/json'
@@ -685,13 +685,13 @@ export default function MermasContent() {
   const stats = React.useMemo(() => {
     const hoy = new Date().toISOString().split('T')[0];
     const registrosHoy = records.filter(record => record.fecha === hoy);
-    const totalMermasHoy = registrosHoy.length;
-    const totalMermasMes = records.filter(record => {
+    const totalMermasHoy = Number(resumenServidor?.mermasHoy ?? registrosHoy.length);
+    const totalMermasMes = Number(resumenServidor?.mermasMes ?? records.filter(record => {
       const fechaRecord = new Date(record.fecha);
       const fechaActual = new Date();
       return fechaRecord.getMonth() === fechaActual.getMonth() && 
              fechaRecord.getFullYear() === fechaActual.getFullYear();
-    }).length;
+    }).length);
     
     return [
       { 
@@ -709,7 +709,7 @@ export default function MermasContent() {
         icon: '📊', 
         color: '#f5942b', 
         bg: 'rgba(245, 148, 43, 0.1)', 
-        change: `${records.length} total`, 
+        change: `${resumenServidor?.totalRegistros ?? records.length} total`,
         positive: totalMermasMes < 5 
       },
       { 
@@ -723,7 +723,7 @@ export default function MermasContent() {
       },
       { 
         title: 'Promedio Diario', 
-        value: records.length > 0 ? Math.round(records.length / 30) : 0, 
+        value: Math.round(Number(resumenServidor?.mermasUltimos30Dias ?? records.length) / 30),
         icon: '📈', 
         color: '#38a169', 
         bg: 'rgba(56, 161, 105, 0.1)', 
@@ -731,7 +731,7 @@ export default function MermasContent() {
         positive: true 
       }
     ];
-  }, [records, sucursalesAsignadas, statsKey, totalPerdidasDinero, loadingTotalPerdidas]);
+  }, [records, sucursalesAsignadas, statsKey, totalPerdidasDinero, loadingTotalPerdidas, resumenServidor]);
 
   const getBranchName = (idCentro: string) => {
     const sucursal = sucursalesAsignadas.find(s => s.idCentro === idCentro);
@@ -787,6 +787,7 @@ export default function MermasContent() {
 
   return (
     <div style={{ padding: '20px' }}>
+      <CacheStatus domain="mermas" onRefresh={fetchRegistrosMermas} />
       
       {/* Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 24 }}>
@@ -897,7 +898,7 @@ export default function MermasContent() {
       <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ margin: 0, color: '#2d3748' }}>Registros de Mermas</h3>
-          <select value={filter} onChange={e => setFilter(e.target.value)} style={{ padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+          <select value={filter} onChange={e => { setPageOffset(0); setFilter(e.target.value); }} style={{ padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: 8 }}>
             <option value="todos">Todos los registros</option>
             <option value="hoy">Solo hoy</option>
             <option value="mes">Este mes</option>
@@ -959,6 +960,7 @@ export default function MermasContent() {
                 onClick={() => {
                   setFiltroFechaInicio('');
                   setFiltroFechaFin('');
+                  setPageOffset(0);
                 }}
                 style={{
                   background: '#6c757d',
@@ -982,7 +984,7 @@ export default function MermasContent() {
               <input
                 type="date"
                 value={filtroFechaInicio}
-                onChange={(e) => setFiltroFechaInicio(e.target.value)}
+                onChange={(e) => { setPageOffset(0); setFiltroFechaInicio(e.target.value); }}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -999,7 +1001,7 @@ export default function MermasContent() {
               <input
                 type="date"
                 value={filtroFechaFin}
-                onChange={(e) => setFiltroFechaFin(e.target.value)}
+                onChange={(e) => { setPageOffset(0); setFiltroFechaFin(e.target.value); }}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -1032,8 +1034,8 @@ export default function MermasContent() {
               <span>📊</span>
               <span>
                 {filtrosActivos ? 
-                  `Mostrando ${getFilteredRecords().length} de ${records.length} registros` :
-                  `${records.length} registros totales`
+                  `Página: ${getFilteredRecords().length} de ${resumenServidor?.totalRegistros ?? records.length} registros` :
+                  `${resumenServidor?.totalRegistros ?? records.length} registros totales`
                 }
               </span>
             </div>
@@ -1166,6 +1168,14 @@ export default function MermasContent() {
             </table>
         </div>
       </div>
+
+      {resumenServidor && <nav aria-label="Páginas de mermas" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 16 }}>
+        <span style={{ fontSize: 13, color: '#526178' }}>Mostrando {records.length ? pageOffset + 1 : 0}–{pageOffset + records.length} de {resumenServidor.totalRegistros}</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" style={btnSecondary} disabled={loadingRecords || pageOffset === 0} onClick={() => setPageOffset(Math.max(0, pageOffset - 20))}>Anterior</button>
+          <button type="button" style={btnSecondary} disabled={loadingRecords || pageOffset + 20 >= Number(resumenServidor.totalRegistros)} onClick={() => setPageOffset(pageOffset + 20)}>Siguiente</button>
+        </div>
+      </nav>}
 
       {/* Modal para Nueva Merma - 2 Pasos */}
       {showNewMermaModal && createPortal(

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { operationalGet, invalidateOperational } from '../services/operationalCache';
+import CacheStatus from './CacheStatus';
 import { getCachedProductSearch } from '../services/productCache';
 import '../styles/recuperaciones.css';
 import { getConReintentos } from '../services/httpRetry';
@@ -123,7 +125,7 @@ export default function RecuperacionesContent() {
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const res = await axios.get(`${API_URL}/recuperaciones/stats`, { headers: getHeaders() });
+      const res = await operationalGet(`${API_URL}/recuperaciones/stats`, { headers: getHeaders() });
       if (res.data.estatus === 1) setStats(res.data);
     } catch {
       // stats opcionales, no bloquear UI
@@ -260,6 +262,7 @@ export default function RecuperacionesContent() {
       const res = await axios.post(`${API_URL}/recuperaciones`, body, { headers: getHeaders() });
       if (res.data.estatus === 1) {
         showNotif('ok', `✅ Recuperación registrada (ID: ${res.data.id}).`);
+        await invalidateOperational(['recuperaciones', 'dashboard']);
         setShowModal(false);
         fetchStats();
       } else {
@@ -280,6 +283,7 @@ export default function RecuperacionesContent() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <CacheStatus domain="recuperaciones" onRefresh={fetchStats} />
 
       {/* Notificación toast */}
       {notif && (
