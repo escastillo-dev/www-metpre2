@@ -4,22 +4,22 @@ body {
     padding: 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background: linear-gradient(135deg, #2368b3 0%, #f5942b 50%, #2368b3 100%);
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+    min-height: 100dvh;
     position: relative;
 }
 
-/* Fondo animado */
+/* Fondo animado + contenedor de scroll: ocupa todo el viewport y centra la
+   tarjeta de login, pero permite desplazamiento vertical cuando el contenido
+   (formulario + teclado virtual) no cabe en pantallas pequeñas. */
 .background-animation {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+    position: fixed;
+    inset: 0;
+    display: flex;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 24px 16px;
+    box-sizing: border-box;
     z-index: 0;
 }
 
@@ -61,10 +61,8 @@ body {
 
 /* Contenedor principal */
 .login-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    position: relative;
+    margin: auto;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
     border-radius: 24px;
@@ -328,6 +326,53 @@ body {
     color: #f5942b;
 }
 
+/* Botón de submit */
+.submit-button {
+    background: linear-gradient(135deg, #2368b3, #f5942b);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    margin-top: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.submit-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(35, 104, 179, 0.2);
+}
+
+.submit-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(35, 104, 179, 0.2);
+}
+
+.submit-button::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+    );
+    transition: 0.5s;
+}
+
+.submit-button:hover::after {
+    left: 100%;
+}
+
 /* Dashboard */
 .dashboard-container {
     display: flex;
@@ -482,7 +527,6 @@ body {
 /* Responsive */
 @media (max-width: 480px) {
     .login-container {
-        margin: 20px;
         padding: 30px 24px;
     }
     

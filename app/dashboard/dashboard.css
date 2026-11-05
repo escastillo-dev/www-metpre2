@@ -12,8 +12,10 @@ body {
 .dashboard-container {
     display: flex;
     height: 100vh;
+    position: relative;
 }
 
+/* ========== SIDEBAR RESPONSIVE ========== */
 .sidebar {
     width: 280px;
     background: linear-gradient(180deg, #2368b3 0%, #1a5490 100%);
@@ -22,31 +24,137 @@ body {
     flex-direction: column;
     box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
     position: relative;
-    z-index: 10;
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+.sidebar.collapsed {
+    width: 80px;
+}
+
+.sidebar-toggle {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    width: 30px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: white;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    transform: rotate(180deg);
+}
+
+.sidebar.collapsed .user-details,
+.sidebar.collapsed .nav-text {
+    display: none;
+}
+
+.sidebar.collapsed .nav-icon {
+    margin-right: 0;
+}
+
+.sidebar.collapsed .nav-item {
+    justify-content: center;
+    padding: 12px 0;
 }
 
 .sidebar-header {
-    padding: 30px 25px;
+    padding: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+}
+
+.header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
 .logo-section {
     display: flex;
     align-items: center;
     gap: 15px;
-    margin-bottom: 10px;
+    padding-right: 30px;
+}
+
+.company-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+}
+
+.sidebar.collapsed .logo-section {
+    justify-content: center;
+    padding-right: 0;
 }
 
 .logo-icon {
-    width: 45px;
+    min-width: 45px;
     height: 45px;
     background: linear-gradient(135deg, #f5942b, #ff6b35);
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
     font-weight: bold;
+    color: white;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    background: #FF7A41;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: white;
+    flex-shrink: 0;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.user-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+}
+
+.user-role {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    font-weight: 500;
 }
 
 .company-name {
@@ -79,6 +187,21 @@ body {
     border-left-color: #f5942b;
 }
 
+/* "Cerrar Sesión" se separa visualmente del resto de opciones de navegación
+   para evitar que se confunda con un módulo más y reducir cierres de sesión
+   accidentales al navegar rápido con el pulgar. */
+.nav-item-logout {
+    margin-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffb4a8;
+}
+
+.nav-item-logout:hover {
+    background: rgba(229, 62, 62, 0.15);
+    color: #fff;
+    border-left-color: #e53e3e;
+}
+
 .main-content {
     flex: 1;
     display: flex;
@@ -89,6 +212,9 @@ body {
 .top-bar {
     background: white;
     padding: 20px 30px;
+    padding-top: calc(20px + env(safe-area-inset-top));
+    padding-left: calc(30px + env(safe-area-inset-left));
+    padding-right: calc(30px + env(safe-area-inset-right));
     border-bottom: 1px solid #e2e8f0;
     display: flex;
     justify-content: space-between;
@@ -187,4 +313,345 @@ body {
     outline: none;
     border-color: #2368b3;
     box-shadow: 0 0 0 3px rgba(35, 104, 179, 0.1);
+}
+
+/* Estilos de paginación */
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: #fff;
+    border-top: 1px solid #e5e7eb;
+    margin-top: auto;
+}
+
+.pagination-info {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.pagination-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.pagination-controls button {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e5e7eb;
+    background-color: #fff;
+    color: #374151;
+    font-size: 0.875rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pagination-controls button:hover:not(:disabled) {
+    background-color: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.pagination-controls button:disabled {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+
+select {
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    background-color: #fff;
+    color: #374151;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+select:focus {
+    outline: none;
+    border-color: #2368b3;
+    box-shadow: 0 0 0 3px rgba(35, 104, 179, 0.1);
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+
+/* Overlay para móvil cuando el sidebar está abierto */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Botón hamburguesa - solo visible en móvil */
+.mobile-menu-toggle {
+    display: none;
+    position: fixed;
+    top: calc(20px + env(safe-area-inset-top));
+    left: calc(20px + env(safe-area-inset-left));
+    z-index: 1001;
+    background: #2368b3;
+    border: none;
+    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.mobile-menu-toggle:hover {
+    background: #1a5490;
+    transform: scale(1.05);
+}
+
+.mobile-menu-toggle:active {
+    transform: scale(0.95);
+}
+
+/* Estilos base para móviles */
+@media (max-width: 767px) {
+    body {
+        overflow-y: auto;
+        height: auto;
+    }
+
+    .dashboard-container {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+    }
+
+    /* Botón hamburguesa visible en móvil */
+    .mobile-menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Sidebar en móvil */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: -100%;
+        width: 280px;
+        height: 100vh;
+        z-index: 1000;
+        transition: left 0.3s ease;
+        overflow-y: auto;
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .sidebar.open {
+        left: 0;
+    }
+
+    /* Ocultar el toggle interno del sidebar en móvil */
+    .sidebar-toggle {
+        display: none;
+    }
+
+    .sidebar.collapsed {
+        left: -100%;
+        width: 280px;
+    }
+
+    .sidebar.collapsed .nav-menu {
+        display: flex;
+    }
+
+    .sidebar.collapsed .user-details,
+    .sidebar.collapsed .company-name {
+        display: flex;
+    }
+
+    .sidebar-header {
+        padding: 15px 20px;
+    }
+
+    .logo-section {
+        gap: 10px;
+    }
+
+    .company-name {
+        font-size: 1.25rem;
+    }
+
+    .logo-icon {
+        min-width: 40px;
+        height: 40px;
+    }
+
+    .user-info {
+        padding: 10px 20px;
+        margin-top: 5px;
+    }
+
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .user-name {
+        font-size: 14px;
+    }
+
+    .user-role {
+        font-size: 12px;
+    }
+
+    .nav-item {
+        padding: 12px 20px;
+    }
+
+    /* Main content ocupa todo el ancho en móvil */
+    .main-content {
+        width: 100%;
+        margin-top: calc(70px + env(safe-area-inset-top)); /* Espacio para el botón hamburguesa + notch/isla dinámica */
+    }
+
+    .top-bar {
+        padding: 15px 20px;
+        padding-left: calc(20px + env(safe-area-inset-left));
+        padding-right: calc(20px + env(safe-area-inset-right));
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .page-title {
+        font-size: 22px;
+    }
+
+    .content-area {
+        padding: 20px 15px;
+    }
+
+    /* Hacer tablas scrollables en móviles */
+    .data-table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -15px;
+        padding: 0 15px;
+    }
+
+    .data-table {
+        min-width: 600px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 12px 15px;
+        font-size: 14px;
+    }
+
+    .search-input {
+        font-size: 16px; /* Evita zoom automático en iOS */
+        padding: 14px 16px;
+    }
+
+    .pagination-container {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .pagination-info {
+        text-align: center;
+    }
+
+    .pagination-controls {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .pagination-controls button {
+        padding: 0.75rem 1rem;
+        min-height: 44px; /* Touch-friendly */
+    }
+
+    select {
+        padding: 0.75rem;
+        min-height: 44px;
+        font-size: 16px;
+    }
+}
+
+/* Estilos para tablets */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .sidebar {
+        width: 240px;
+    }
+
+    .sidebar.collapsed {
+        width: 70px;
+    }
+
+    .sidebar-toggle {
+        display: flex;
+    }
+
+    .mobile-menu-toggle {
+        display: none;
+    }
+
+    .main-content {
+        margin-top: 0;
+    }
+
+    .content-area {
+        padding: 25px;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 12px 20px;
+    }
+}
+
+/* Estilos para pantallas grandes (Desktop) */
+@media (min-width: 1024px) {
+    .dashboard-container {
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    .sidebar {
+        position: relative;
+        left: 0;
+    }
+
+    .sidebar-toggle {
+        display: flex;
+    }
+
+    .mobile-menu-toggle {
+        display: none;
+    }
+
+    .sidebar-overlay {
+        display: none !important;
+    }
+
+    .main-content {
+        margin-top: 0;
+    }
 }
