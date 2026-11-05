@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { operationalGet, invalidateOperational } from '../services/operationalCache';
 import CacheStatus from './CacheStatus';
-import { getCachedProductSearch } from '../services/productCache';
+import { useProductSearch } from '../hooks/useProductSearch';
+import ProductSearchControls from './ProductSearchControls';
 import '../styles/productos-consumidos.css';
 import { getConReintentos } from '../services/httpRetry';
 import { getCached } from '../services/apiCache';
@@ -106,9 +107,8 @@ export default function ProductosConsumidosContent() {
   const [form, setForm] = useState({ idCentro: '', idColaborador: '', Cantidad: '1', Comentario: '' });
   const [producto, setProducto] = useState<ProductoBusqueda | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sugerencias, setSugerencias] = useState<ProductoBusqueda[]>([]);
-  const [loadingProductos, setLoadingProductos] = useState(false);
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const productSearch = useProductSearch<ProductoBusqueda>();
+  const { products: sugerencias, loading: loadingProductos, reset: resetProductSearch } = productSearch;
   const [showScanner, setShowScanner] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const guardandoRef = useRef(false);
@@ -117,25 +117,13 @@ export default function ProductosConsumidosContent() {
   const buscarProductos = (q: string) => {
     setSearchTerm(q);
     setProducto(null);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (!q || q.length < 2) { setSugerencias([]); return; }
-    setLoadingProductos(true);
-    searchTimeout.current = setTimeout(async () => {
-      try {
-        const res = await getCachedProductSearch(q);
-        if (res.data.estatus === 1) setSugerencias(res.data.productos || []);
-      } catch {
-        // ignorar
-      } finally {
-        setLoadingProductos(false);
-      }
-    }, 300);
+    productSearch.search(q);
   };
 
   const seleccionarProducto = (p: ProductoBusqueda) => {
     setProducto(p);
     setSearchTerm(p.Producto || p.Descripcion || '');
-    setSugerencias([]);
+    resetProductSearch();
   };
 
   const handleBarcodeScanned = (codigo: string) => {
@@ -148,7 +136,7 @@ export default function ProductosConsumidosContent() {
     setForm(f => ({ ...f, idColaborador: '', Cantidad: '1', Comentario: '' }));
     setProducto(null);
     setSearchTerm('');
-    setSugerencias([]);
+    resetProductSearch();
     setFolioGenerado(null);
   };
 
@@ -352,7 +340,7 @@ export default function ProductosConsumidosContent() {
                         background: 'white', maxHeight: 200, overflowY: 'auto',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.08)', position: 'absolute', width: '100%', zIndex: 10,
                       }}>
-                        {loadingProductos ? (
+                        {loadingProductos && sugerencias.length === 0 ? (
                           <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>🔍 Buscando productos...</div>
                         ) : sugerencias.length > 0 ? (
                           sugerencias.map(p => (
@@ -371,9 +359,14 @@ export default function ProductosConsumidosContent() {
                               <span style={{ background: '#2368b3', color: 'white', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>➕ Seleccionar</span>
                             </button>
                           ))
-                        ) : searchTerm.length >= 2 ? (
+                        ) : searchTerm.trim().length >= 2 && !productSearch.error ? (
                           <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>No se encontraron productos</div>
                         ) : null}
+                        {searchTerm.trim().length >= 2 && (
+                          <ProductSearchControls count={sugerencias.length} total={productSearch.total}
+                            loading={loadingProductos} error={productSearch.error} hasMore={productSearch.hasMore}
+                            loadMore={productSearch.loadMore} refresh={productSearch.refresh} />
+                        )}
                       </div>
                     )}
                   </>

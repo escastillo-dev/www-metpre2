@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { operationalGet, invalidateOperational } from '../services/operationalCache';
 import CacheStatus from './CacheStatus';
-import { getCachedProductSearch } from '../services/productCache';
+import { useProductSearch } from '../hooks/useProductSearch';
+import ProductSearchControls from './ProductSearchControls';
 import { createPortal } from 'react-dom';
 import '../styles/mermas-modal.css';
 import { getConReintentos } from '../services/httpRetry';
@@ -75,10 +76,9 @@ export default function MermasContent() {
 
   // Estados para búsqueda y gestión de productos
   const [searchTerm, setSearchTerm] = useState('');
-  const [productos, setProductos] = useState<any[]>([]);
   const [productosSeleccionados, setProductosSeleccionados] = useState<any[]>([]);
-  const [loadingProductos, setLoadingProductos] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const productSearch = useProductSearch();
+  const { products: productos, loading: loadingProductos, reset: resetProductSearch } = productSearch;
   const [showScanner, setShowScanner] = useState(false);
 
   // Estados para modal de detalles
@@ -343,54 +343,18 @@ export default function MermasContent() {
   };
 
   // Función para buscar productos
-  const buscarProductos = async (termino: string) => {
-    if (!termino || termino.length < 2) {
-      setProductos([]);
-      return;
-    }
-
-    setLoadingProductos(true);
-    try {
-      const userCredentials = localStorage.getItem('userCredentials');
-      if (!userCredentials) return;
-
-      const response = await getCachedProductSearch(termino);
-
-      if (response.data.estatus === 1) {
-        setProductos(response.data.productos || []);
-      }
-    } catch (error) {
-      console.error('Error al buscar productos:', error);
-    } finally {
-      setLoadingProductos(false);
-    }
+  const buscarProductos = (termino: string) => {
+    setSearchTerm(termino);
+    productSearch.search(termino);
   };
 
-  // Función para manejar la búsqueda con debounce
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    
-    // Limpiar timeout anterior
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
+  const handleSearchChange = buscarProductos;
 
-    // Establecer nuevo timeout
-    const newTimeout = setTimeout(() => {
-      buscarProductos(value);
-    }, 300); // Esperar 300ms después de que el usuario deje de escribir
-
-    setSearchTimeout(newTimeout);
-  };
-
-  // Función para manejar el código escaneado con la cámara
   const handleBarcodeScanned = (codigo: string) => {
     setShowScanner(false);
-    setSearchTerm(codigo);
     buscarProductos(codigo);
   };
 
-  // Función para agregar producto a la lista
   const agregarProducto = (producto: any) => {
     const yaExiste = productosSeleccionados.find(p => p.CodigoBarras === producto.CodigoBarras);
     if (!yaExiste) {
@@ -400,7 +364,7 @@ export default function MermasContent() {
         idMotMer: nuevaMerma.motivoGeneral || motivosMerma[0]?.idMotMer || '' // Motivo por defecto
       }]);
       setSearchTerm('');
-      setProductos([]);
+      resetProductSearch();
     }
   };
 
@@ -1376,7 +1340,7 @@ export default function MermasContent() {
                         background: 'white',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
                       }}>
-                        {loadingProductos ? (
+                        {loadingProductos && productos.length === 0 ? (
                           <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>
                             🔍 Buscando productos...
                           </div>
@@ -1410,11 +1374,16 @@ export default function MermasContent() {
                               </span>
                             </button>
                           ))
-                        ) : searchTerm.length >= 2 ? (
+                        ) : searchTerm.trim().length >= 2 && !productSearch.error ? (
                           <div style={{ padding: 16, textAlign: 'center', color: '#718096', fontSize: 13 }}>
                             No se encontraron productos
                           </div>
                         ) : null}
+                        {searchTerm.trim().length >= 2 && (
+                          <ProductSearchControls count={productos.length} total={productSearch.total}
+                            loading={loadingProductos} error={productSearch.error} hasMore={productSearch.hasMore}
+                            loadMore={productSearch.loadMore} refresh={productSearch.refresh} />
+                        )}
                       </div>
                     )}
                   </div>
