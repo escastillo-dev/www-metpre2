@@ -24,7 +24,11 @@ const formatFecha = (f: string) => {
   try {
     const d = new Date(f);
     if (isNaN(d.getTime())) return f;
-    return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+    // La API devuelve YYYY-MM-DD: conservar el día calendario sin convertirlo a hora local.
+    return d.toLocaleDateString('es-MX', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      ...(/^\d{4}-\d{2}-\d{2}$/.test(f) ? { timeZone: 'UTC' } : {}),
+    });
   } catch {
     return f;
   }
